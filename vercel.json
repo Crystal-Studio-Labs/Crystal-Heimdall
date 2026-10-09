@@ -29,7 +29,7 @@
   "crons": [
     {
       "path": "/api/v1/cron/poll",
-      "schedule": "* * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }

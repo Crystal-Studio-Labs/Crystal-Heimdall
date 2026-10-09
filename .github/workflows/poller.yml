@@ -1,0 +1,19 @@
+name: "Crystal Heimdall Synthetic Poller"
+
+on:
+  schedule:
+    # Runs every 5 minutes (Free GitHub Actions cron poller)
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  poll:
+    name: "Trigger Synthetic Probes"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Execute Synthetic Health Checks"
+        run: |
+          TARGET_URL="${{ secrets.HEIMDALL_APP_URL || 'https://crystal-heimdall.vercel.app' }}"
+          echo "Dispatching synthetic poll cycle to: ${TARGET_URL}/api/v1/cron/poll"
+          RESPONSE=$(curl -s -X GET "${TARGET_URL}/api/v1/cron/poll" || echo '{"error":"Failed to connect"}')
+          echo "Poll Result: ${RESPONSE}"

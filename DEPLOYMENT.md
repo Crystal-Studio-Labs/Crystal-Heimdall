@@ -217,9 +217,16 @@ In Vercel Project Settings ➔ **Environment Variables**, provide:
 > [!NOTE]
 > If `TURSO_DATABASE_URL` is omitted, Crystal Heimdall defaults to `/tmp/heimdall-data/heimdall.db`. However, `/tmp` is ephemeral in serverless environments, so connecting a free Turso LibSQL database is strongly recommended for production persistence.
 
-### Step 4: Automatic Vercel Cron Poller
-`vercel.json` automatically registers a Vercel Cron job:
-* **Schedule:** `* * * * *` (every 60 seconds)
-* **Endpoint:** `GET /api/v1/cron/poll`
-* Executes the synthetic poll cycle serverlessly without requiring an always-on VM or daemon!
+### Step 4: Synthetic Polling on Vercel (Hobby vs. Pro Plan)
+
+* **Vercel Hobby Tier:** Vercel limits free Hobby accounts to daily cron executions (`0 0 * * *`). To avoid build rejection errors on Vercel Hobby, `vercel.json` is configured with `"schedule": "0 0 * * *"`.
+* **High-Frequency Free Polling (Every 1–5 Minutes):**
+  To maintain continuous 60-second or 5-minute synthetic probes without paying for Vercel Pro, choose either zero-cost approach:
+  1. **GitHub Actions Workflow (Included):**
+     * Located in `.github/workflows/poller.yml`.
+     * Runs every 5 minutes completely free on GitHub runners.
+     * Add `HEIMDALL_APP_URL` in your GitHub repository's **Settings > Secrets and variables > Actions** with your Vercel deployment URL (e.g. `https://your-domain.vercel.app`).
+  2. **External Free Cron Services:**
+     * Use free tools such as [cron-job.org](https://cron-job.org), [updown.io](https://updown.io), or [EasyCron](https://www.easycron.com) to ping `https://your-domain.vercel.app/api/v1/cron/poll` every 1 minute.
+* **Vercel Pro Tier:** If you upgrade to Vercel Pro, you can change `schedule` in `vercel.json` to `* * * * *` for native minute-by-minute execution.
 
