@@ -1,4 +1,31 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist-client",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/api",
+      "destination": "/api"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/sitemap.xml"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/robots.txt"
+    },
+    {
+      "source": "/((?!api|api/|sitemap\\.xml|robots\\.txt|.*\\..*).*)",
+      "destination": "/index.html"
+    }
+  ],
   "crons": [
     {
       "path": "/api/v1/cron/poll",

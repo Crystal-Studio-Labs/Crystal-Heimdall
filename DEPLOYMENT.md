@@ -183,3 +183,43 @@ To restore from backup:
 cp /backups/heimdall-YYYYMMDD.db /app/data/heimdall.db
 pm2 restart crystal-heimdall
 ```
+
+---
+
+## 7. Option D: Vercel Serverless Hosting (Zero-Cost Cloud Deployment)
+
+Crystal Heimdall is pre-configured for single-click deployment on [Vercel](https://vercel.com):
+
+### Step 1: Import Repository
+1. In the Vercel dashboard, click **"Add New..."** ➔ **"Project"**.
+2. Select your private GitHub repository: `SahooShuvranshu/Crystal-Heimdall`.
+
+### Step 2: Build & Framework Configuration
+The configuration is automatically applied from [`vercel.json`](file:///d:/Projects/Crystal-Heimdall/vercel.json):
+* **Framework Preset:** `Other` (or auto-detected Vite)
+* **Build Command:** `npm run build` (builds both `dist-client` and `dist-server`)
+* **Output Directory:** `dist-client`
+* **Serverless Functions:** Routed via `api/index.js`
+
+### Step 3: Configure Environment Variables
+In Vercel Project Settings ➔ **Environment Variables**, provide:
+
+| Variable | Required | Description |
+|---|---|---|
+| `TURSO_DATABASE_URL` | **Yes (for Vercel)** | Remote LibSQL database URL (e.g., `libsql://heimdall-crystal.turso.io`). Provides persistent storage across serverless cold starts. |
+| `TURSO_AUTH_TOKEN` | **Yes (for Vercel)** | Turso database authentication token. |
+| `JWT_SECRET` | **Yes** | High-entropy secret for operator session signing. |
+| `TOTP_SECRET` | **Yes** | Base32 seed for operator 2FA verification. |
+| `DISCORD_WEBHOOK_URL` | Optional | Webhook URL for real-time Discord channel alerts. |
+| `TELEGRAM_BOT_TOKEN` | Optional | Telegram bot token for instant push notifications. |
+| `TELEGRAM_CHAT_ID` | Optional | Telegram chat or group identifier. |
+
+> [!NOTE]
+> If `TURSO_DATABASE_URL` is omitted, Crystal Heimdall defaults to `/tmp/heimdall-data/heimdall.db`. However, `/tmp` is ephemeral in serverless environments, so connecting a free Turso LibSQL database is strongly recommended for production persistence.
+
+### Step 4: Automatic Vercel Cron Poller
+`vercel.json` automatically registers a Vercel Cron job:
+* **Schedule:** `* * * * *` (every 60 seconds)
+* **Endpoint:** `GET /api/v1/cron/poll`
+* Executes the synthetic poll cycle serverlessly without requiring an always-on VM or daemon!
+

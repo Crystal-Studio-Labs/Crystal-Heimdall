@@ -19,7 +19,9 @@ export function getDb(): Client {
         authToken: tursoToken,
       });
     } else {
-      const dataDir = path.resolve(__dirname, "../../data");
+      const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+      const defaultDataDir = isServerless ? "/tmp/heimdall-data" : path.resolve(__dirname, "../../data");
+      const dataDir = process.env.DATA_DIR || defaultDataDir;
       if (!fs.existsSync(dataDir)) {
         fs.mkdirSync(dataDir, { recursive: true });
       }

@@ -315,7 +315,25 @@ async function runSmokeTests() {
     }
   }
 
-  console.log("\n🎉 ALL 20 COMPREHENSIVE VERIFICATION TESTS PASSED NOMINAL! 🎉");
+  // 21. Vercel Serverless Root & Health Endpoint
+  console.log("\n21. TEST VERCEL SERVERLESS ROOT & HEALTH ENDPOINT (/api & /api/health)");
+  const apiRootRes = await fetch(`${BASE_URL}/api`);
+  const apiRootData = await apiRootRes.json();
+  if (apiRootRes.status === 200 && apiRootData.sentinel === "Crystal Heimdall" && apiRootData.status === "operational") {
+    console.log(`   ✅ Vercel Serverless root /api verified: status=${apiRootData.status}, runtime=${apiRootData.runtime}`);
+  } else {
+    throw new Error(`Failed to verify /api health endpoint: ${JSON.stringify(apiRootData)}`);
+  }
+
+  const healthRes = await fetch(`${BASE_URL}/api/health`);
+  const healthData = await healthRes.json();
+  if (healthRes.status === 200 && healthData.status === "operational") {
+    console.log(`   ✅ Vercel Serverless health /api/health verified: status=${healthData.status}`);
+  } else {
+    throw new Error(`Failed to verify /api/health endpoint: ${JSON.stringify(healthData)}`);
+  }
+
+  console.log("\n🎉 ALL 21 COMPREHENSIVE VERIFICATION TESTS PASSED NOMINAL! 🎉");
 }
 
 runSmokeTests().catch((err) => {
