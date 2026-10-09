@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#08090b"/>
+  <rect x="16" y="16" width="480" height="480" fill="none" stroke="#27272a" stroke-width="8"/>
+  <rect x="28" y="28" width="456" height="456" fill="none" stroke="#34d399" stroke-width="4"/>
+  <!-- Industrial Lightning Bolt / Radar Glyphs -->
+  <polygon points="288,64 138,278 256,278 224,448 374,234 256,234" fill="#34d399"/>
+  <!-- Monospace Subtext Stamp -->
+  <text x="256" y="480" font-family="monospace" font-size="28" font-weight="900" fill="#a1a1aa" text-anchor="middle" letter-spacing="4">UPTIME TRACKER</text>
+</svg>
