@@ -89,6 +89,29 @@ app.get("/api/v1/cron/poll", async (req, res) => {
   }
 });
 
+// Serve XML Sitemap & Robots.txt explicitly
+app.get("/sitemap.xml", (_req, res) => {
+  const distPath = path.resolve(__dirname, "../dist-client/sitemap.xml");
+  const pubPath = path.resolve(__dirname, "../client/public/sitemap.xml");
+  const target = fs.existsSync(distPath) ? distPath : pubPath;
+  if (fs.existsSync(target)) {
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    return res.sendFile(target);
+  }
+  return res.status(404).send("Sitemap not found");
+});
+
+app.get("/robots.txt", (_req, res) => {
+  const distPath = path.resolve(__dirname, "../dist-client/robots.txt");
+  const pubPath = path.resolve(__dirname, "../client/public/robots.txt");
+  const target = fs.existsSync(distPath) ? distPath : pubPath;
+  if (fs.existsSync(target)) {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    return res.sendFile(target);
+  }
+  return res.status(404).send("Robots.txt not found");
+});
+
 // Static Client Serving (Production)
 const clientDist = path.resolve(__dirname, "../dist-client");
 if (fs.existsSync(clientDist)) {

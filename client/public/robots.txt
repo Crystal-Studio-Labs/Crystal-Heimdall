@@ -1,0 +1,16 @@
+# Robots.txt for Crystal Heimdall
+User-agent: *
+Allow: /
+Allow: /overview
+Allow: /incidents
+Allow: /incidents/*
+Allow: /docs
+Allow: /sitemap.xml
+
+# Disallow private operator control routes and raw API endpoints from search index
+Disallow: /dashboard/
+Disallow: /dashboard/*
+Disallow: /api/
+
+# XML Sitemap Index
+Sitemap: https://status.crystalstudio.labs/sitemap.xml
