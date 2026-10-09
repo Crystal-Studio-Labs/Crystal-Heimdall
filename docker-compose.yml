@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  crystal-heimdall:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crystal-heimdall
+    restart: unless-stopped
+    ports:
+      - "3030:3030"
+    environment:
+      - PORT=3030
+      - NODE_ENV=production
+      - JWT_SECRET=${JWT_SECRET:-crystal-heimdall-secret-key-change-in-prod}
+      - TOTP_SECRET=${TOTP_SECRET:-CRYSTALHEIMDALLTOTPSECRETKEY2026}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+    volumes:
+      - ./data:/app/data

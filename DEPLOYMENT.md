@@ -230,3 +230,94 @@ In Vercel Project Settings ➔ **Environment Variables**, provide:
      * Use free tools such as [cron-job.org](https://cron-job.org), [updown.io](https://updown.io), or [EasyCron](https://www.easycron.com) to ping `https://your-domain.vercel.app/api/v1/cron/poll` every 1 minute.
 * **Vercel Pro Tier:** If you upgrade to Vercel Pro, you can change `schedule` in `vercel.json` to `* * * * *` for native minute-by-minute execution.
 
+---
+
+## 8. Option E: Render (Recommended for Continuous 24/7 Monitoring)
+
+[Render](https://render.com) runs persistent Node.js servers, allowing the internal 60-second synthetic poller daemon to run **continuously 24/7** without requiring external cron triggers or serverless workarounds.
+
+### 1-Click Blueprint Deploy:
+1. Push this repository to GitHub (already synced!).
+2. In the Render Dashboard, click **"New"** ➔ **"Blueprint"**.
+3. Connect your repository `SahooShuvranshu/Crystal-Heimdall`.
+4. Render will automatically read [`render.yaml`](file:///d:/Projects/Crystal-Heimdall/render.yaml):
+   * **Runtime:** Node.js
+   * **Build Command:** `npm run build`
+   * **Start Command:** `npm start`
+   * **Persistent Disk:** Mounts `/app/data` to preserve your SQLite database across restarts!
+5. Add `JWT_SECRET` and `TOTP_SECRET` in the dashboard.
+
+---
+
+## 9. Option F: Railway (Best Developer Experience & 1-Click Volumes)
+
+[Railway](https://railway.app) provides native container hosting with 1-click persistent volume attachments:
+
+1. In Railway, click **"New Project"** ➔ **"Deploy from GitHub repo"**.
+2. Select `SahooShuvranshu/Crystal-Heimdall`.
+3. Railway will automatically detect the multi-stage [`Dockerfile`](file:///d:/Projects/Crystal-Heimdall/Dockerfile).
+4. Go to the service **"Volumes"** tab ➔ **"Add Volume"**:
+   * **Mount Path:** `/app/data`
+5. In **"Variables"**, add your `JWT_SECRET`, `TOTP_SECRET`, and notification webhooks.
+6. Click **"Deploy"**. The background poller runs 24/7 continuously!
+
+---
+
+## 10. Option G: Fly.io (Free Edge Containers & NVMe Volume)
+
+[Fly.io](https://fly.io) includes a free tier with up to 3 shared-CPU VMs and 3GB of persistent NVMe volume storage:
+
+1. Install Fly CLI: `curl -L https://fly.io/install.sh | sh` (or `iwr https://fly.io/install.ps1 -useb | iex` on Windows).
+2. Authenticate: `fly auth login`.
+3. Create persistent storage volume:
+   ```bash
+   fly volumes create heimdall_data --size 1 --region iad
+   ```
+4. Deploy using the included [`fly.toml`](file:///d:/Projects/Crystal-Heimdall/fly.toml):
+   ```bash
+   fly launch --no-deploy
+   fly deploy
+   ```
+
+---
+
+## 11. Option H: Koyeb (Free Always-On Micro-Instance)
+
+[Koyeb](https://koyeb.com) offers a free "Eco" instance that does not sleep:
+1. Connect your GitHub repository `SahooShuvranshu/Crystal-Heimdall`.
+2. Choose **Buildpack** (or Dockerfile).
+3. Set Port to `3030`.
+4. Provide environment variables (`TURSO_DATABASE_URL` or use Turso for persistence).
+5. Deploy.
+
+---
+
+## 12. Option I: Oracle Cloud "Always Free" Tier (100% Free Dedicated VPS Forever)
+
+Oracle Cloud Infrastructure (OCI) provides the most generous free tier in cloud computing:
+* **Resources:** Up to 4 ARM Ampere OCPUs, 24 GB RAM, and 200 GB Block Volume **free forever**.
+* **Setup:**
+  1. Create a free Ubuntu VM instance on Oracle Cloud.
+  2. Clone the repository via SSH.
+  3. Run with Docker Compose:
+     ```bash
+     git clone git@github.com:SahooShuvranshu/Crystal-Heimdall.git
+     cd Crystal-Heimdall
+     docker compose up -d --build
+     ```
+  4. Full control, persistent disk, zero third-party limits, and 100% privacy!
+
+---
+
+## 📊 Platform Comparison Matrix
+
+| Hosting Platform | Type | Free Tier? | Background Poller (60s) | SQLite Persistence | Best Suited For |
+|---|---|---|---|---|---|
+| **Vercel** | Serverless | Yes (Hobby) | External cron / GitHub Actions | Ephemeral `/tmp` (Requires Turso) | Fast edge CDN, status page showcase |
+| **Render** | Persistent Web Service | Yes (Free/Starter) | ✅ Native 24/7 Poller | ✅ Persistent Disk ($1/mo) or Turso | Zero-maintenance container hosting |
+| **Railway** | Persistent Container | $5 Trial Credit | ✅ Native 24/7 Poller | ✅ 1-Click Volume Mount | Rapid staging and production scaling |
+| **Fly.io** | Micro VM | Yes (Free Allowance) | ✅ Native 24/7 Poller | ✅ Free 3GB NVMe Volume | Lowest latency global edge deployment |
+| **Oracle Cloud** | Dedicated Cloud VPS | ✅ Free Forever | ✅ Native 24/7 Poller | ✅ 200GB Free SSD Storage | Enterprise reliability, full data ownership |
+| **Private VPS** | Dedicated Linux VM | Paid ($3–$5/mo) | ✅ Native 24/7 Poller | ✅ Local SSD | Total control, Docker Compose, internal VPN |
+
+
