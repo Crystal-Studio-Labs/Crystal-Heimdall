@@ -1,80 +1,83 @@
-# 🗺️ Crystal Heimdall — Route Catalog & SEO Metadata Registry
+# 🗺️ Crystal Heimdall — Route Catalog, Sitemap & SEO Indexation Policy
 
-> **Complete inventory of all mapped frontend routes, SEO graph metadata, crawl policies, and structured data schemas.**
-
----
-
-## 1. Route Inventory & Navigation Matrix
-
-| Path | Component | Access Level | Change Frequency | Search Indexing | Priority |
-|---|---|---|---|---|---|
-| `/` | `StatusPage.tsx` | **Public** | Always (Live) | `index, follow` | **1.0** |
-| `/overview` | `LandingPage.tsx` | **Public** | Weekly | `index, follow` | **0.9** |
-| `/incidents` | `IncidentsPage.tsx` | **Public** | Hourly | `index, follow` | **0.9** |
-| `/incidents/:id` | `IncidentDetailPage.tsx` | **Public** | Static/Hourly | `index, follow` | **0.8** |
-| `/docs` | `DocsPage.tsx` | **Public** | Weekly | `index, follow` | **0.8** |
-| `/login` | `LoginPage.tsx` | **Public** | Monthly | `noindex, nofollow` | **0.3** |
-| `/dashboard` | `DashboardPage.tsx` | **Protected (2FA)** | N/A | `noindex, nofollow` | — |
-| `/dashboard/analytics` | `AnalyticsPage.tsx` | **Protected (2FA)** | N/A | `noindex, nofollow` | — |
-| `/dashboard/settings` | `SettingsPage.tsx` | **Protected (2FA)** | N/A | `noindex, nofollow` | — |
-| `*` | `NotFoundPage.tsx` | **Public** | N/A | `noindex, nofollow` | — |
+> **🔒 CLASSIFICATION: PROPRIETARY & CONFIDENTIAL // FOR INTERNAL USE ONLY**  
+> **PROPERTY OF CRYSTAL STUDIO LABS — ALL RIGHTS RESERVED.**  
+> *Sitemap specifications and search crawler policy for Crystal Heimdall.*
 
 ---
 
-## 2. Per-Page SEO & Open Graph Metadata
+## 1. Route Matrix & Crawler Policy
 
-### 2.1 `/` — Public Live Status Page
-- **Page Title:** `Crystal Heimdall // Autonomous Reliability Sentinel`
-- **Meta Description:** `Continuous multi-point health monitoring across all public platforms, APIs, and microservices for Crystal Studio Labs.`
-- **Canonical URL:** `https://status.crystalstudio.labs/`
-- **Open Graph Image:** `https://status.crystalstudio.labs/og-image.svg` (1200×630px)
-- **Twitter Card:** `summary_large_image`
-- **JSON-LD Type:** `SoftwareApplication` / `Organization`
+To protect internal operations while keeping public service uptime completely transparent, Crystal Heimdall strictly partitions its route tree into **Public Indexed** and **Private Excluded** surfaces:
 
-### 2.2 `/overview` — Architecture & Platform Overview
-- **Page Title:** `Architecture & Overview // Crystal Heimdall`
-- **Meta Description:** `Autonomous reliability sentinel, Uptime Kuma monitoring engine, and Sentry crash tracker designed for Crystal Studio Labs infrastructure.`
-- **Canonical URL:** `https://status.crystalstudio.labs/overview`
-- **Open Graph Image:** `https://status.crystalstudio.labs/og-image.svg`
-- **Twitter Card:** `summary_large_image`
-- **JSON-LD Type:** `WebPage`
-
-### 2.3 `/incidents` — Incident Ledger & Postmortems
-- **Page Title:** `Incident Ledger & Postmortems // Crystal Heimdall`
-- **Meta Description:** `Public historical record of service incidents, system anomalies, resolution timelines, and postmortem telemetry for Crystal Studio Labs infrastructure.`
-- **Canonical URL:** `https://status.crystalstudio.labs/incidents`
-- **Open Graph Image:** `https://status.crystalstudio.labs/og-image.svg`
-- **Twitter Card:** `summary_large_image`
-- **JSON-LD Type:** `CollectionPage`
-
-### 2.4 `/incidents/:id` — Incident Deep-Dive & Timeline
-- **Page Title:** `<Incident Title> // Incident Postmortem`
-- **Meta Description:** `<Incident Diagnostic Message & MTTR summary>`
-- **Canonical URL:** `https://status.crystalstudio.labs/incidents/:id`
-- **Open Graph Image:** `https://status.crystalstudio.labs/og-image.svg`
-- **Twitter Card:** `summary_large_image`
-- **JSON-LD Type:** `Article` / `Report`
-
-### 2.5 `/docs` — Developer API & Telemetry Guide
-- **Page Title:** `Developer API & Ingestion Guide // Crystal Heimdall`
-- **Meta Description:** `Comprehensive technical reference for integrating synthetic health checks, exception telemetry webhooks, dead-man cron switches, and Sentry crash sinks.`
-- **Canonical URL:** `https://status.crystalstudio.labs/docs`
-- **Open Graph Image:** `https://status.crystalstudio.labs/og-image.svg`
-- **Twitter Card:** `summary_large_image`
-- **JSON-LD Type:** `TechArticle`
-
-### 2.6 `/login` — Operator 2FA Gateway
-- **Page Title:** `Operator Authentication Gate // Crystal Heimdall`
-- **Meta Description:** `Direct Two-Factor Authentication (RFC 6238 TOTP) access gate for Crystal Studio Labs infrastructure operators.`
-- **Robots Directive:** `noindex, nofollow`
-
-### 2.7 Protected Operator Deck (`/dashboard`, `/dashboard/analytics`, `/dashboard/settings`)
-- **Robots Directive:** `noindex, nofollow` (Blocked in `robots.txt` and meta tags)
+```mermaid
+graph TD
+    Root[/] --> PublicZone[Public Indexed Zone]
+    Root --> PrivateZone[Private Excluded Zone]
+    
+    PublicZone --> P1["/ (Live Status Page)"]
+    PublicZone --> P2["/overview (Architecture Showcase)"]
+    PublicZone --> P3["/incidents (Incident Ledger)"]
+    PublicZone --> P4["/incidents/:id (Postmortems)"]
+    PublicZone --> P5["/docs (Developer Guide)"]
+    
+    PrivateZone --> PR1["/dashboard (Command Deck)"]
+    PrivateZone --> PR2["/dashboard/analytics (SLA Matrix)"]
+    PrivateZone --> PR3["/dashboard/settings (Engine Config)"]
+    PrivateZone --> PR4["/login (2FA Gate)"]
+    PrivateZone --> PR5["/api/* (Internal APIs)"]
+```
 
 ---
 
-## 3. Search Engine Discovery Files
+## 2. Public Route Catalog (Included in `sitemap.xml`)
 
-- **XML Sitemap:** Accessible at [`/sitemap.xml`](https://status.crystalstudio.labs/sitemap.xml)
-- **Robots Directives:** Accessible at [`/robots.txt`](https://status.crystalstudio.labs/robots.txt)
-- **Web App Manifest:** Accessible at [`/manifest.webmanifest`](https://status.crystalstudio.labs/manifest.webmanifest)
+| Path | Change Frequency | Priority | Description |
+|---|---|---|---|
+| `/` | `always` | `1.0` | Live status page with heartbeat ribbons, active announcements, and fleet metrics. |
+| `/overview` | `weekly` | `0.8` | Platform capabilities and Industrial Brutalism design architecture. |
+| `/incidents` | `hourly` | `0.9` | Public incident ledger with search, severity filters, and MTTR counters. |
+| `/docs` | `monthly` | `0.7` | Developer API reference and client integration code snippets. |
+| `/login` | `yearly` | `0.3` | 2FA-Only operator login gate (present for navigational completeness). |
+
+The XML sitemap is served directly from:
+* Endpoint: `GET /sitemap.xml`
+* File Source: [`client/public/sitemap.xml`](file:///d:/Projects/Crystal-Heimdall/client/public/sitemap.xml)
+
+---
+
+## 3. Private Operator Routes (Excluded via `robots.txt` & `noindex`)
+
+The following internal routes are **strictly disallowed** from search indexation:
+
+| Path | Exclusion Mechanism | Reason |
+|---|---|---|
+| `/dashboard` | `Disallow: /dashboard` + `<meta name="robots" content="noindex, nofollow" />` | Internal fleet monitoring and probe triggers. |
+| `/dashboard/analytics` | `Disallow: /dashboard` + `<meta name="robots" content="noindex, nofollow" />` | Internal SLA metrics and per-monitor performance matrices. |
+| `/dashboard/settings` | `Disallow: /dashboard` + `<meta name="robots" content="noindex, nofollow" />` | Engine settings, notification conduits, and database maintenance. |
+| `/login` | `<meta name="robots" content="noindex, nofollow" />` | Operator gate should not be indexed on search engines. |
+| `/api/*` | `Disallow: /api/` | Internal REST endpoints and telemetry sinks. |
+
+Web crawler directives are defined in [`client/public/robots.txt`](file:///d:/Projects/Crystal-Heimdall/client/public/robots.txt):
+```txt
+User-agent: *
+Allow: /
+Allow: /overview
+Allow: /incidents
+Allow: /docs
+Disallow: /dashboard
+Disallow: /dashboard/
+Disallow: /api/
+Disallow: /api/*
+
+Sitemap: http://localhost:3030/sitemap.xml
+```
+
+---
+
+## 4. Open Graph & Social Card Assets
+
+Every public page dynamically injects rich preview metadata:
+* **Image Asset:** High-resolution preview at [`/og-image.png`](file:///d:/Projects/Crystal-Heimdall/client/public/og-image.png) (1200×630) and scalable vector graphic at [`/og-image.svg`](file:///d:/Projects/Crystal-Heimdall/client/public/og-image.svg).
+* **Twitter Card:** Set to `summary_large_image`.
+* **Schema.org JSON-LD:** Structured data for `SoftwareApplication` and `WebSite` included automatically via [`client/src/components/SEO.tsx`](file:///d:/Projects/Crystal-Heimdall/client/src/components/SEO.tsx).

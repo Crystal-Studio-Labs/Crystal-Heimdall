@@ -1,30 +1,47 @@
 # 🚀 Crystal Heimdall — Production Deployment Guide
 
-> **Production Deployment Strategies for Crystal Heimdall**  
-> *Choose between standalone VPS, PM2 daemon, Docker container, or 100% free serverless with Vercel and Turso.*
+> **🔒 CLASSIFICATION: PROPRIETARY & CONFIDENTIAL // FOR INTERNAL USE ONLY**  
+> **PROPERTY OF CRYSTAL STUDIO LABS — ALL RIGHTS RESERVED.**  
+> *Internal runbook for deploying and operating Crystal Heimdall across Crystal Studio Labs infrastructure.*
 
 ---
 
-## 1. Quick Production Build
+## 1. Private Infrastructure Prerequisites
 
-Before deploying to any target environment, generate the optimized client assets and compiled server binaries:
+Before deploying Crystal Heimdall to internal servers or clouds:
+1. **Repository Access:** Ensure the deployment server has deploy key or SSH access to `git@github.com:Crystal-Studio-Labs/Crystal-Heimdall.git`.
+2. **Secrets Provisioning:** Populate `.env` from the official **Crystal Studio Labs 1Password / Vault** vault. Do not commit `.env`.
+3. **Network Boundary:** 
+   * Expose public status endpoints (`/`, `/overview`, `/incidents`, `/docs`) via reverse proxy (Caddy / Nginx).
+   * Restrict access to `/dashboard*` via **Cloudflare Zero Trust Access**, **Tailscale**, or HTTP Basic Auth reverse-proxy layers.
+
+---
+
+## 2. Production Build Execution
+
+Compile the optimized client bundle and TypeScript server:
 
 ```bash
-# 1. Install dependencies
+# 1. Install dependencies strictly from lockfile
 npm ci
 
 # 2. Compile Vite client and TypeScript server
 npm run build
 
-# 3. Test launch on port 3030
-node dist-server/index.js
+# 3. Verify with smoke test suite
+node test-smoke.mjs
 ```
+
+Build outputs:
+* `dist-client/`: Static Single-Page Application assets.
+* `dist-server/`: Compiled Node.js ESM server binaries.
+* `data/heimdall.db`: LibSQL / SQLite persistent database.
 
 ---
 
-## 2. Option A: PM2 Process Manager (Recommended for VPS)
+## 3. Option A: PM2 Process Manager (Recommended for Private VPS)
 
-Using [PM2](https://pm2.keymetrics.io/) ensures automatic process restarts, background clustering, and log rotation:
+Using PM2 provides process supervision, automatic revival on system reboots, and log rotation:
 
 ```bash
 # 1. Install PM2 globally
@@ -33,16 +50,23 @@ npm install -g pm2
 # 2. Launch Crystal Heimdall as background service
 pm2 start dist-server/index.js --name "crystal-heimdall"
 
-# 3. Save process list to revive on system reboot
+# 3. Configure startup script
 pm2 save
 pm2 startup
 ```
 
+Monitoring the PM2 daemon:
+```bash
+pm2 status
+pm2 logs crystal-heimdall
+pm2 restart crystal-heimdall
+```
+
 ---
 
-## 3. Option B: Docker & Docker Compose
+## 4. Option B: Docker Container Deployment
 
-Deploy with container isolation and persistent SQLite volumes.
+Run in an isolated container with volume persistence for SQLite:
 
 ### `Dockerfile`
 ```dockerfile
@@ -58,104 +82,65 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3030
 COPY --from=builder /app/package*.json ./
-RUN npm ci --omit=dev
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist-client ./dist-client
 COPY --from=builder /app/dist-server ./dist-server
-VOLUME ["/app/data"]
+COPY --from=builder /app/data ./data
+
 EXPOSE 3030
 CMD ["node", "dist-server/index.js"]
 ```
 
 ### `docker-compose.yml`
 ```yaml
-version: "3.8"
+version: '3.8'
+
 services:
-  sentinel:
+  crystal-heimdall:
     build: .
     container_name: crystal-heimdall
-    restart: unless-stopped
+    restart: always
     ports:
       - "3030:3030"
-    volumes:
-      - ./data:/app/data
     environment:
       - PORT=3030
-      - DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
-      - TELEGRAM_BOT_TOKEN=...
-      - TELEGRAM_CHAT_ID=...
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/heimdall.db
+      - JWT_SECRET=${JWT_SECRET}
+      - TOTP_SECRET=${TOTP_SECRET}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+    volumes:
+      - ./data:/app/data
 ```
 
-Run container:
+Launch with:
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
 ---
 
-## 4. Option C: Systemd Service (Linux VPS / Ubuntu / Debian)
+## 5. Option C: Nginx Reverse Proxy & Cloudflare Zero Trust Perimeter
 
-Create `/etc/systemd/system/crystal-heimdall.service`:
+Configure Nginx to route public status traffic while protecting internal operator routes:
 
-```ini
-[Unit]
-Description=Crystal Heimdall Reliability Sentinel
-After=network.target
-
-[Service]
-Type=simple
-User=node
-WorkingDirectory=/var/www/crystal-heimdall
-ExecStart=/usr/bin/node dist-server/index.js
-Restart=always
-RestartSec=5
-Environment=PORT=3030
-Environment=NODE_ENV=production
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start:
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now crystal-heimdall
-sudo systemctl status crystal-heimdall
-```
-
----
-
-## 5. Option D: 100% Free Cloud Serverless (Vercel + Turso)
-
-1. **Provision Free Turso Database:**
-   - Sign up at [turso.tech](https://turso.tech) and create a free database.
-   - Run `turso db show <name>` and copy `TURSO_DATABASE_URL` (`libsql://...`) and auth token.
-
-2. **Deploy to Vercel:**
-   - Link repository to Vercel.
-   - Configure Environment Variables:
-     - `TURSO_DATABASE_URL=libsql://your-db-name.turso.io`
-     - `TURSO_AUTH_TOKEN=your-token`
-   - `vercel.json` will automatically schedule `/api/v1/cron/poll` every 1 minute.
-
----
-
-## 6. Reverse Proxy Configuration
-
-### Nginx Reverse Proxy
 ```nginx
 server {
     listen 80;
-    server_name status.crystalstudio.labs;
+    server_name status.crystalstudiolabs.internal;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name status.crystalstudio.labs;
+    server_name status.crystalstudiolabs.internal;
 
-    ssl_certificate /etc/letsencrypt/live/status.crystalstudio.labs/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/status.crystalstudio.labs/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/status.crystalstudiolabs.internal/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/status.crystalstudiolabs.internal/privkey.pem;
 
+    # Public Routes & Assets
     location / {
         proxy_pass http://127.0.0.1:3030;
         proxy_http_version 1.1;
@@ -166,12 +151,35 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+
+    # Internal Operator Deck (Optionally restrict by internal IP or Cloudflare Access)
+    location /dashboard {
+        # Allow internal corporate VPN / Tailscale subnet
+        # allow 10.0.0.0/8;
+        # allow 100.64.0.0/10; # Tailscale CGNAT
+        # deny all;
+
+        proxy_pass http://127.0.0.1:3030;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
 }
 ```
 
-### Caddy Server
-```caddy
-status.crystalstudio.labs {
-    reverse_proxy 127.0.0.1:3030
-}
+---
+
+## 6. Database Backup & Disaster Recovery Procedures
+
+The persistent LibSQL database resides in `data/heimdall.db`. Execute scheduled snapshots:
+
+```bash
+# Automated SQLite snapshot via cron
+0 3 * * * sqlite3 /app/data/heimdall.db ".backup '/backups/heimdall-$(date +\%Y\%m\%d).db'"
+```
+
+To restore from backup:
+```bash
+cp /backups/heimdall-YYYYMMDD.db /app/data/heimdall.db
+pm2 restart crystal-heimdall
 ```

@@ -1,197 +1,84 @@
-# 🏛️ Crystal Heimdall — System Architecture & Technical Specifications
+# 🏛️ Crystal Heimdall — Architecture & System Design
 
-> **Autonomous Reliability Sentinel, Synthetic Uptime Poller & Crash Ingestion Deck**  
-> *Developed by Crystal Studio Labs. Crafted in authentic Industrial Brutalism.*
+> **🔒 CLASSIFICATION: PROPRIETARY & CONFIDENTIAL // FOR INTERNAL USE ONLY**  
+> **PROPERTY OF CRYSTAL STUDIO LABS — ALL RIGHTS RESERVED.**  
+> *Architectural reference and subsystem topology for Crystal Studio Labs internal engineering.*
 
 ---
 
-## 1. High-Level System Architecture
+## 1. System Topology Overview
 
-Crystal Heimdall is engineered as a unified, zero-bloat reliability sentinel. It operates simultaneously as an **Active Synthetic Poller** (pull-based probing) and a **Passive Telemetry Sink** (push-based crash ingestion), presenting metrics through an **Industrial Brutalism** user interface.
+Crystal Heimdall serves as the central reliability sentinel for all internal microservices, workers, APIs, and batch cron tasks across Crystal Studio Labs.
 
 ```mermaid
 graph TD
-    subgraph Monitored Targets
-        A1[Web APIs & Endpoints]
-        A2[Background Cron Jobs]
-        A3[Application Workers & Services]
+    subgraph Private Network [Internal Microservices & Daemons]
+        AuthSvc[Crystal Auth Gateway] -->|Passive Sentry Telemetry| Sink[POST /api/v1/telemetry/errors]
+        ApiSvc[Crystal Studio Labs API] -->|Active Synthetic Probing| Poller[Synthetic Poller Loop]
+        CronSvc[Nightly Backup Cron] -->|Dead-Man Heartbeat| Heartbeat[GET /api/v1/ping/:key]
     end
 
-    subgraph Crystal Heimdall Core Engine
-        B1[Synthetic Poller Daemon 60s]
-        B2[Dead-Man Heartbeat Watcher]
-        B3[Passive Exception Ingestion Sink]
-        B4[Sentry Crash Telemetry Sink]
-        B5[Storm Deduplication Engine 15m]
-        B6[LibSQL / SQLite Local Database]
+    subgraph Core Engine [Crystal Heimdall Core]
+        Poller --> Dedup[15m Sliding Deduplication Window]
+        Sink --> Dedup
+        Heartbeat --> Dedup
+        Dedup --> DB[(LibSQL / SQLite Database)]
+        DB --> Dispatcher[Discord & Telegram Conduits]
     end
 
-    subgraph Notification & Alert Relays
-        C1[Discord Rich Embeds]
-        C2[Telegram Bot Dispatcher]
-        C3[Web Audio Klaxon Siren]
+    subgraph Client Surfaces [Frontend Interfaces]
+        DB --> PublicUI[Public Status Page & Incidents]
+        DB --> PrivUI[Protected Operator Console / Dashboard]
     end
-
-    subgraph Client Application Surfaces
-        D1[Public Live Status Page /]
-        D2[Public Incident Ledger /incidents]
-        D3[Developer API Guide /docs]
-        D4[System Overview /overview]
-        D5[Operator Command Deck /dashboard]
-        D6[Analytics SLA Matrix /dashboard/analytics]
-        D7[Uptime Kuma Engine Config /dashboard/settings]
-    end
-
-    A1 -->|Synthetic Ping 60s| B1
-    A2 -->|GET /api/v1/ping/:key| B2
-    A3 -->|POST /api/v1/alerts| B3
-    A3 -->|POST /api/v1/telemetry/errors| B4
-
-    B1 --> B5
-    B2 --> B5
-    B3 --> B5
-    B4 --> B5
-
-    B5 --> B6
-    B5 -->|Disruptions| C1
-    B5 -->|Disruptions| C2
-    B5 -->|Critical Outages| C3
-
-    B6 --> D1
-    B6 --> D2
-    B6 --> D3
-    B6 --> D4
-    B6 --> D5
-    B6 --> D6
-    B6 --> D7
 ```
 
 ---
 
 ## 2. Core Subsystems
 
-### 2.1 Dual-Engine Observability
+### A. Dual-Engine Observability Matrix
+1. **Active Synthetic HTTP/HTTPS Prober:**
+   * Periodically checks endpoint availability (configurable 10s–300s).
+   * Measures precise DNS, TCP, and TLS round-trip latencies.
+   * Compares HTTP status codes against accepted response lists (e.g., `200, 201, 204`).
+2. **Inverted "Dead-Man's Snitch" Cron Poller:**
+   * For background batch tasks and nightly database backups that cannot be directly queried.
+   * Expects pings at specified intervals. Triggers an incident if the heartbeat is overdue.
 
-1. **Active Synthetic Poller (`server/poller.ts`):**
-   - Runs on a non-blocking 60-second polling daemon (`runPollCycle()`).
-   - Executes round-robin HTTP/HTTPS requests with configurable timeout (default 10s).
-   - Validates status codes against acceptable code ranges (`200-299, 301, 302`).
-   - Automatically inspects TLS/SSL certificate validity windows and detects expiring certificates.
-   - Records discrete latency data points into `telemetry_points` for percentile and histogram analysis.
+### B. Passive Crash Sentinel & Telemetry Sink
+* Compatible with standard error loggers and Sentry-style clients (`POST /api/v1/telemetry/errors`).
+* Automatically extracts stack traces, normalizes error signatures, generates automated fingerprints, and tracks occurrence counts without third-party cloud data leakage.
 
-2. **Dead-Man's Switch (`server/routes/services.ts`):**
-   - Monitors scheduled workers, nightly database backups, and cron jobs.
-   - Monitored workers check in at `GET /api/v1/ping/:key`.
-   - If a heartbeat is overdue by more than `expected_interval + grace_period`, an automatic critical outage incident is tripped.
+### C. 15-Minute Sliding Window Deduplication
+* Prevents alert storms during cascading service outages.
+* Groups recurring failures under an existing incident record within a 15-minute window while silently incrementing event counters.
 
-3. **Inbound Exception Ingestion (`server/routes/alerts.ts`):**
-   - Microservices relay uncaught exceptions, promise rejections, and fatal logs via `POST /api/v1/alerts`.
-   - Requires Bearer token authentication scoped to the individual service.
-
-4. **Sentry-Style Crash Telemetry (`server/routes/telemetry.ts`):**
-   - Passive error ingestion endpoint (`POST /api/v1/telemetry/errors`) accepting structured error payloads with stack traces.
-   - Deduplicates identical error signatures (`error_fingerprint`), tracks occurrence counts, and presents an interactive issue inspector on the Operator Dashboard.
-
----
-
-### 2.2 Alert Storm Deduplication (`server/deduplicator.ts`)
-
-During cascading infrastructure outages, dozens of downstream workers might trigger simultaneous alert dispatches. Heimdall implements a sliding 15-minute in-memory and database deduplication cache:
-- Errors with matching `(service_id, title)` within 15 minutes are suppressed from duplicate notification relays.
-- The occurrence counter is incremented (`× 42 occurrences`).
-- Dispatches are resumed only after cooldown expiry or state transitions.
-
----
-
-### 2.3 Progressive Web App (PWA) & Web Audio Klaxon Siren
-
-- **Offline Caching:** Handled by `client/public/sw.js` with stale-while-revalidate strategy.
-- **Auditory Alert Engine (`client/src/lib/audioAlerts.ts`):**
-  - Synthesized via the native browser **Web Audio API** (no external audio assets required).
-  - Uses dual square/sawtooth oscillators modulating between 660 Hz and 880 Hz with exponential gain envelopes to produce an authentic high-urgency industrial alarm.
-  - Armed/Muted toggle persists in local storage and executes instant audible sirens on P0 downtime events.
+### D. Multi-Period SLA Availability Matrix
+* Maintains rolling availability percentages for 24-Hour, 7-Day, and 30-Day windows.
+* Computes latency percentiles (P50, P95, P99) and Mean Time to Recovery (MTTR).
 
 ---
 
 ## 3. Database Schema (LibSQL / SQLite)
 
-The database schema is managed via LibSQL (`server/db.ts`), supporting local SQLite files (`data/heimdall.db`) and remote Turso edges:
+The embedded LibSQL database (`data/heimdall.db`) stores configuration and state in four optimized tables:
 
-```sql
--- Monitored Targets
-CREATE TABLE services (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  type TEXT NOT NULL,             -- 'http-poll', 'deadman-cron', 'passive-sink'
-  endpoint TEXT,
-  expected_interval_sec INTEGER,
-  status TEXT DEFAULT 'healthy',  -- 'healthy', 'warning', 'critical', 'maintenance'
-  latency_ms INTEGER,
-  uptime_pct REAL DEFAULT 100.0,
-  is_public INTEGER DEFAULT 1,
-  is_maintenance INTEGER DEFAULT 0,
-  api_key TEXT UNIQUE,
-  last_ping_at INTEGER,
-  consecutive_failures INTEGER DEFAULT 0,
-  created_at INTEGER
-);
-
--- Historical Incidents Ledger
-CREATE TABLE incidents (
-  id TEXT PRIMARY KEY,
-  service_id TEXT,
-  title TEXT NOT NULL,
-  message TEXT,
-  severity TEXT NOT NULL,         -- 'critical', 'warning', 'info'
-  status TEXT DEFAULT 'active',   -- 'active', 'acknowledged', 'resolved'
-  count INTEGER DEFAULT 1,
-  created_at INTEGER,
-  last_seen_at INTEGER,
-  resolved_at INTEGER
-);
-
--- Real-Time Latency Telemetry Points
-CREATE TABLE telemetry_points (
-  id TEXT PRIMARY KEY,
-  service_id TEXT,
-  latency_ms INTEGER,
-  status_code INTEGER,
-  recorded_at INTEGER
-);
-
--- Sentry Crash Issues
-CREATE TABLE sentry_errors (
-  id TEXT PRIMARY KEY,
-  fingerprint TEXT UNIQUE,
-  title TEXT NOT NULL,
-  message TEXT,
-  stack_trace TEXT,
-  severity TEXT DEFAULT 'error',
-  status TEXT DEFAULT 'unresolved',
-  count INTEGER DEFAULT 1,
-  first_seen_at INTEGER,
-  last_seen_at INTEGER,
-  resolved_at INTEGER
-);
-
--- Uptime Kuma Status Page & Engine Settings
-CREATE TABLE status_settings (
-  key TEXT PRIMARY KEY,
-  value TEXT
-);
-```
+1. **`services`**: Monitored endpoints, check types, poll intervals, status (`healthy`, `degraded`, `down`, `maintenance`), and isolated API keys.
+2. **`incidents`**: Identified outages, severity (`info`, `warning`, `critical`), triage state (`investigating`, `acknowledged`, `resolved`), and resolution timestamps.
+3. **`telemetry_pings`**: Time-series log of all synthetic probes and response times for SLA graphing.
+4. **`status_settings`**: Configurable branding, announcement banners, SLA toggles, and engine tuning.
+5. **`error_issues`**: Passive crash reports with stack traces, environment tags, and triage status.
 
 ---
 
-## 4. Design System: Industrial Brutalism
+## 4. Industrial Brutalism Design Tokens
 
-Crystal Heimdall strictly adheres to the **Industrial Brutalism** design philosophy:
-1. **Zero Curvature:** `border-radius: 0px !important` across all containers, inputs, badges, and modals.
-2. **Deep Monolithic Palette:** Base canvas `#070a0f`, surface cards `#0b0f17`, borders `#27272a`.
-3. **Hard 3D Block Shadows:** Tactile `shadow-[4px_4px_0px_#000]` offset shadows with mechanical button press translations (`active:translate-x-[1px] active:translate-y-[1px]`).
-4. **Monospace Dominance:** JetBrains Mono for diagnostic meters, SLA percentages, and data headers; Inter for long-form explanatory reading.
-5. **Color Semantics:**
-   - Emerald (`#10b981`): Healthy, Nominal, Resolved.
-   - Cyan (`#06b6d4`): Poller Telemetry, Metrics, Inbound Hooks.
-   - Amber (`#f59e0b`): Warning, Partial Degradation, Dead-Man Tracking.
-   - Rose (`#f43f5e`): Outage, Critical Disruption, Siren Alert.
+The user interface follows strict Industrial Brutalism guidelines:
+* **Geometry:** `border-radius: 0px !important` across all buttons, cards, dialogs, inputs, and badges.
+* **Palette:**
+  * Background: Deep Tactical Void (`#070a0f` / `#08090b`).
+  * Surface Panels: Hard Jet Black (`#000000`) and Obsidian (`#0b0f17`).
+  * Borders: Heavy 2px–3px Zinc (`#27272a`).
+  * Accents: High-voltage Emerald (`#10b981`), Cyber Cyan (`#38bdf8`), and Critical Crimson (`#ef4444`).
+* **Shadows:** Hard 3D block shadows (`shadow-[4px_4px_0px_#000]`).
+* **Typography:** `JetBrains Mono` and browser monospace for all diagnostic meters, headers, and telemetry logs.

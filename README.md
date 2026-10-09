@@ -1,54 +1,87 @@
 # ⚡ CRYSTAL HEIMDALL // Autonomous Reliability Sentinel
 
-> **Industrial Brutalism Uptime Tracker, Telemetry Sentinel & Synthetic Monitor for Crystal Studio Labs.**  
-> *Zero-cost, standalone PWA with built-in Uptime Kuma features, Sentry crash ingestion, and Web Audio siren alerts.*
+![Crystal Heimdall Banner](./client/public/banner.svg)
+
+> **🔒 CLASSIFICATION: PROPRIETARY & CONFIDENTIAL // FOR INTERNAL USE ONLY**  
+> **PROPERTY OF CRYSTAL STUDIO LABS — ALL RIGHTS RESERVED.**  
+> *Unauthorized copying, distribution, cloning, public deployment, or reverse engineering of this software is strictly prohibited.*
 
 ---
 
-## 🏛️ System Capabilities & Architecture
+## 🏛️ System Overview
 
-* **Industrial Brutalism Design System:** Zero-radius hard geometries (`border-radius: 0px !important`), high-contrast monospace typography, 3D offset drop shadows (`shadow-[4px_4px_0px_#000]`), and tactile mechanical interactions.
-* **Public Status Page (`/`):** Clean, real-time public status interface displaying fleet-wide health status, 30-day uptime heartbeat strips, announcement notice banners, and minimal Crystal Studio Labs footer.
-* **2FA-Only Operator Authentication (`/login`):** Direct Two-Factor Authentication gate via RFC 6238 6-digit TOTP (Google Authenticator, Ente Auth, 1Password). Zero master passwords and zero third-party OAuth dependencies.
-* **Command Deck (`/dashboard`):** High-density operator cockpit with live service registration, instant single-target probe triggering (`[ PING NOW ]`), maintenance mode toggles, and incident triage.
-* **Analytics & Uptime Kuma SLA Matrix (`/dashboard/analytics`):**
-  * Interactive monitor selector bar (`[ ALL MONITORS ]` + target pills).
-  * Multi-Period Availability Matrix Table tracking 24-Hour, 7-Day, and 30-Day SLA uptime percentages, real-time ping latencies, and check volumes.
-  * Latency distribution curves (P50, P95, P99) and error histograms.
-* **Uptime Kuma Advanced Engine (`/dashboard/settings`):**
-  * Poller Heartbeat & Backoff Intervals (Default Interval, Timeout Threshold, Max Retries, Resend Alert Cooldown).
-  * TLS / SSL Certificate Validation Matrix (Certificate Expiry Warning Window & Ignore Invalid SSL toggle).
-  * HTTP Protocol Specifications & Assertions (Default Method, Custom User-Agent, Accepted Status Codes, Follow Redirects).
-  * Telemetry Data Retention Policy & Maintenance Center (Purge Incidents, Prune Telemetry, Vacuum SQLite).
-* **Progressive Web App (PWA) & Klaxon Siren Alarms:**
-  * Installable standalone PWA (`manifest.webmanifest`, service worker caching).
-  * Synthesized Web Audio multi-oscillator klaxon sirens that alert operators instantly when a critical outage occurs.
-* **Sentry-Style Crash Sentinel:**
-  * Ingests unhandled client/server stack traces via passive telemetry sink (`POST /api/v1/telemetry/errors`).
-  * Real-time crash issue inspector with error grouping and resolution triage.
-* **Emergency Dispatch Conduits:**
-  * Instant rich embed delivery to Discord channels.
-  * Instant push alerts to Telegram chats.
+**Crystal Heimdall** is the dedicated, private reliability sentinel and infrastructure monitoring platform engineered exclusively for **Crystal Studio Labs**. Built with an **Industrial Brutalism** design system (`border-radius: 0px !important`), high-density monospace telemetry meters, and zero third-party telemetry bloat, Heimdall delivers continuous uptime monitoring, synthetic poll loops, passive Sentry crash collection, and Web Audio siren alerts for internal operators.
 
 ---
 
-## 🧭 Routes & Endpoints
+## 🔒 Private Repository & Team Onboarding Guidelines
 
-| Route | Access | Description |
+### 1. Repository Access & Cloning
+This repository is private. Team members must authenticate via SSH or GitHub CLI with active Crystal Studio Labs organization membership:
+```bash
+# Clone via SSH (Recommended)
+git clone git@github.com:Crystal-Studio-Labs/Crystal-Heimdall.git
+cd Crystal-Heimdall
+```
+
+### 2. Environment Secrets & Security Policy
+* **Never commit `.env` or sensitive credentials** to git.
+* Obtain the internal team secrets (e.g., `JWT_SECRET`, `TOTP_SECRET`, `DISCORD_WEBHOOK_URL`, `TELEGRAM_BOT_TOKEN`) from the official **Crystal Studio Labs 1Password / Vault** under `Engineering > Crystal-Heimdall`.
+* Create your local configuration file from template:
+  ```bash
+  cp .env.example .env
+  ```
+
+### 3. Operator 2FA Enrollment (Zero Master Passwords)
+Crystal Heimdall does not use master passwords or third-party OAuth. Operators log in via **RFC 6238 TOTP**:
+* In production, each authorized engineer scans their provisioned TOTP QR code into an authenticator app (Google Authenticator, Ente Auth, 1Password).
+* In local development or isolated staging environments, emergency code `000000` is accepted for rapid testing.
+
+### 4. Network Isolation & Perimeter Security
+* The **Public Status Page (`/`)** and **Incident Ledger (`/incidents`)** are designed for public consumer and stakeholder visibility.
+* The **Operator Deck (`/dashboard*`)** must be protected behind an internal network perimeter (such as **Cloudflare Zero Trust Access**, **Tailscale**, or private reverse proxy).
+* All dashboard routes are hard-shielded against web crawlers with `<meta name="robots" content="noindex, nofollow" />` and `robots.txt` disallow rules.
+
+---
+
+## 🏛️ Core Capabilities
+
+* **Industrial Brutalism Design Language:** Strict 0px radius geometries, high-contrast monochrome & emerald aesthetics, 3D block shadows (`shadow-[4px_4px_0px_#000]`), and tactile mechanical button states.
+* **Dual-Engine Synthetic Monitoring:**
+  * Active HTTP/HTTPS probing with configurable method, custom headers, timeout thresholds, and retry exponential backoffs.
+  * Inverted "Dead-Man's Snitch" cron heartbeats (`GET /api/v1/ping/:key`) for batch scripts and internal backup daemons.
+* **Passive Crash Sentinel & Exception Sink:**
+  * Sentry-compatible lightweight ingestion sink (`POST /api/v1/telemetry/errors`) for internal services and microservices.
+  * Real-time stack trace inspection, automated fingerprint grouping, and error triage.
+* **Uptime Kuma SLA Matrix (`/dashboard/analytics`):**
+  * Multi-period availability table calculating 24-Hour, 7-Day, and 30-Day SLA uptime percentages.
+  * Real-time ping latency distributions (P50, P95, P99).
+* **Advanced Engine Settings (`/dashboard/settings`):**
+  * Heartbeat poller intervals, SSL certificate expiry warnings, HTTP status assertions.
+  * Database maintenance center (Incident purge, telemetry pruning, and SQLite vacuuming).
+* **Progressive Web App (PWA) & Emergency Sirens:**
+  * Standalone installable app (`manifest.webmanifest`, service worker cache).
+  * Synthesized Web Audio multi-oscillator klaxon sirens that alert on-call operators immediately during downtime.
+* **Instant Dispatch Conduits:**
+  * Webhook alert delivery to Discord channels and Telegram bot chats.
+
+---
+
+## 🧭 Routes & Access Directory
+
+| Route | Classification | Description |
 |---|---|---|
-| `/` | Public | Real-time status page, announcement banner, 30-day uptime bars, minimal footer. |
-| `/overview` | Public | Architectural overview and platform showcase for Crystal Studio Labs. |
-| `/incidents` | Public | Historical incident ledger with severity/status filters and MTTR metrics. |
-| `/incidents/:id` | Public | Deep-dive postmortem and incident timeline breakdown. |
-| `/docs` | Public | Developer API reference and client code snippets (Node, Python, Go, cURL). |
-| `/login` | Public | 2FA-Only operator authentication gate (6-digit TOTP). |
-| `/dashboard` | Operator | Command deck, monitor cards, instant probe trigger, maintenance mode toggles. |
-| `/dashboard/analytics` | Operator | Uptime Kuma multi-period availability table, monitor filter, latency percentiles. |
-| `/dashboard/settings` | Operator | Status Page editor, Uptime Kuma engine config, notification conduits, maintenance actions. |
-| `/sitemap.xml` | Public | Search engine discovery sitemap with priorities and change frequencies. |
-| `/robots.txt` | Public | Web crawler indexation policies (allows public, disallows /dashboard). |
-| `/manifest.webmanifest` | Public | PWA web app manifest with standalone display configuration. |
-| `/sw.js` | Public | PWA Service Worker caching and background notification handler. |
+| [`/`](file:///d:/Projects/Crystal-Heimdall/client/src/pages/StatusPage.tsx) | **Public** | Real-time status page, announcement banner, 30-day uptime bars, minimal footer. |
+| [`/overview`](file:///d:/Projects/Crystal-Heimdall/client/src/pages/LandingPage.tsx) | **Public** | Architectural overview and platform showcase for Crystal Studio Labs. |
+| [`/incidents`](file:///d:/Projects/Crystal-Heimdall/client/src/pages/IncidentsPage.tsx) | **Public** | Historical incident ledger with severity/status filters and MTTR metrics. |
+| [`/incidents/:id`](file:///d:/Projects/Crystal-Heimdall/client/src/pages/IncidentDetailPage.tsx) | **Public** | Deep-dive postmortem and incident timeline breakdown. |
+| [`/docs`](file:///d:/Projects/Crystal-Heimdall/client/src/pages/DocsPage.tsx) | **Public** | Developer API reference and client code snippets (Node, Python, Go, cURL). |
+| [`/login`](file:///d:/Projects/Crystal-Heimdall/client/src/pages/LoginPage.tsx) | **Public** | 2FA-Only operator authentication gate (6-digit TOTP). |
+| [`/dashboard`](file:///d:/Projects/Crystal-Heimdall/client/src/pages/DashboardPage.tsx) | **Internal Operator** | Command deck, monitor cards, instant probe trigger, maintenance mode toggles. |
+| [`/dashboard/analytics`](file:///d:/Projects/Crystal-Heimdall/client/src/pages/AnalyticsPage.tsx) | **Internal Operator** | Uptime Kuma multi-period availability table, monitor filter, latency percentiles. |
+| [`/dashboard/settings`](file:///d:/Projects/Crystal-Heimdall/client/src/pages/SettingsPage.tsx) | **Internal Operator** | Status Page editor, Uptime Kuma engine config, notification conduits, maintenance actions. |
+| [`/sitemap.xml`](file:///d:/Projects/Crystal-Heimdall/client/public/sitemap.xml) | **Public** | Search engine discovery sitemap with priorities and change frequencies. |
+| [`/robots.txt`](file:///d:/Projects/Crystal-Heimdall/client/public/robots.txt) | **Public** | Web crawler indexation policies (allows public, disallows /dashboard). |
 
 ---
 
@@ -66,9 +99,9 @@
 
 ```bash
 # 1. Install dependencies
-npm install
+npm ci
 
-# 2. Build client and server bundles
+# 2. Compile client and server bundles
 npm run build
 
 # 3. Launch production server on port 3030
@@ -80,12 +113,13 @@ Or run dev server with hot reload:
 npm run dev
 ```
 
-Open:
+Endpoints:
 * **Status Page:** [http://localhost:3030](http://localhost:3030)
 * **Operator Console:** [http://localhost:3030/dashboard](http://localhost:3030/dashboard)
 
 ---
 
-## 📜 License
-MIT License — Crystal Studio Labs &copy; 2026.
+## 📜 Intellectual Property & Confidentiality
 
+**PROPRIETARY AND CONFIDENTIAL — CRYSTAL STUDIO LABS &copy; 2026. ALL RIGHTS RESERVED.**  
+This software and associated documentation contain proprietary information belonging to Crystal Studio Labs. Reproduction, distribution, or public display without prior written permission is strictly prohibited.

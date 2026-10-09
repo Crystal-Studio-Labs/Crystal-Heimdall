@@ -1,270 +1,125 @@
-# ⚡ Crystal Heimdall — REST API & Integration Reference
+# 📡 Crystal Heimdall — REST API & Integration Reference
 
-> **API Version:** `v1`  
-> **Base URL:** `http://localhost:3030/api/v1` (or your deployed custom domain)  
-> **Format:** JSON (`application/json; charset=utf-8`)
-
----
-
-## 1. Authentication & Security
-
-1. **Public Endpoints:** No authentication required (`GET /status`, `GET /incidents`, `GET /incidents/:id`).
-2. **Service Scoped Endpoints:** Authenticated via Bearer token (`Authorization: Bearer <service_api_key>`) or path key (`/ping/:key`).
-3. **Operator Command Endpoints:** Protected by operator session token issued upon 6-digit TOTP verification (`/api/v1/auth/verify-2fa`).
+> **🔒 CLASSIFICATION: PROPRIETARY & CONFIDENTIAL // FOR INTERNAL USE ONLY**  
+> **PROPERTY OF CRYSTAL STUDIO LABS — ALL RIGHTS RESERVED.**  
+> *Internal API reference for microservice integrations and administrative telemetry within Crystal Studio Labs.*
 
 ---
 
-## 2. Status & Public Endpoints
+## 1. Authentication & Security Model
 
-### 2.1 Get Fleet Status
-```http
-GET /api/v1/status
-```
-Returns overall operational state, publicly visible targets, 30-day uptime bars, and active maintenance announcements.
+Crystal Heimdall separates public status reads from privileged operator writes:
 
-**Response (200 OK):**
-```json
-{
-  "overallStatus": "operational",
-  "avgUptime": 99.88,
-  "services": [
-    {
-      "id": "svc-781",
-      "name": "Crystal Auth Gateway",
-      "type": "http-poll",
-      "status": "healthy",
-      "latency_ms": 248,
-      "uptime_pct": 100.0,
-      "is_maintenance": 0,
-      "historyBlocks": [
-        { "day": "2026-10-09", "status": "healthy", "uptime": 100 }
-      ]
-    }
-  ],
-  "recentIncidents": [],
-  "settings": {
-    "page_title": "Crystal Heimdall",
-    "page_description": "Continuous Multi-Point Health Monitoring",
-    "announcement_banner": "All systems nominal across all regions.",
-    "announcement_type": "info",
-    "show_sla": true,
-    "show_incidents": true,
-    "footer_text": "Crystal Studio Labs • Autonomous Reliability Sentinel"
-  },
-  "lastUpdated": 1791574000000
-}
-```
+1. **Public Read Endpoints:** Open to all clients (`/api/v1/status`, `/api/v1/incidents`).
+2. **Service Reporting Tokens:** Monitored microservices authenticate using their target API key:
+   ```http
+   Authorization: Bearer svc-key-xxxxxxxxxxxx
+   ```
+3. **Operator Deck Endpoints:** Operator commands require signed JWT tokens obtained via the 2FA-Only login gate (`POST /api/v1/auth/login`).
 
 ---
 
-### 2.2 Get Incident History
-```http
-GET /api/v1/incidents
-```
-Returns the list of historical incidents ordered by most recent activity.
+## 2. Public Status & Incident Endpoints
 
-**Response (200 OK):**
-```json
-{
-  "incidents": [
-    {
-      "id": "inc-mv1df5ap",
-      "service_id": "svc-781",
-      "service_name": "Crystal Auth Gateway",
-      "title": "Synthetic Probe Threshold Violation",
-      "message": "Endpoint returned HTTP 503 Service Unavailable",
-      "severity": "critical",
-      "status": "resolved",
-      "count": 1,
-      "created_at": 1791573900000,
-      "last_seen_at": 1791574200000,
-      "resolved_at": 1791574300000
-    }
-  ]
-}
-```
-
----
-
-### 2.3 Get Single Incident
-```http
-GET /api/v1/incidents/:id
-```
-Returns a single incident record with associated service metadata and timestamps.
-
-**Response (200 OK):**
-```json
-{
-  "incident": {
-    "id": "inc-mv1df5ap",
-    "service_id": "svc-781",
-    "service_name": "Crystal Auth Gateway",
-    "service_type": "http-poll",
-    "service_endpoint": "https://auth.crystalstudio.labs/health",
-    "title": "Synthetic Probe Threshold Violation",
-    "message": "Endpoint returned HTTP 503 Service Unavailable",
-    "severity": "critical",
-    "status": "resolved",
-    "count": 1,
-    "created_at": 1791573900000,
-    "last_seen_at": 1791574200000,
-    "resolved_at": 1791574300000
+### `GET /api/v1/status`
+Retrieves public status summary, overall fleet health, and active public services.
+* **Access:** Public
+* **Response:**
+  ```json
+  {
+    "overallStatus": "operational",
+    "avgUptime": 99.98,
+    "services": [
+      {
+        "id": "svc-1",
+        "name": "Crystal Auth Gateway",
+        "type": "http-poll",
+        "status": "healthy",
+        "latency_ms": 142,
+        "uptime": 99.95,
+        "is_public": 1
+      }
+    ]
   }
-}
-```
+  ```
+
+### `GET /api/v1/incidents`
+Lists historical incidents with support for query, severity, and status filtering.
+* **Access:** Public
+* **Query Parameters:** `search`, `status` (`investigating`, `acknowledged`, `resolved`), `severity` (`critical`, `warning`, `info`).
+
+### `GET /api/v1/incidents/:id`
+Retrieves individual incident detail, chronological timeline, and raw stack telemetry.
+* **Access:** Public
 
 ---
 
-## 3. Ingestion & Heartbeat Sinks
+## 3. Inbound Telemetry & Service Reporting (Private)
 
-### 3.1 Ingest Unhandled Exception
-```http
-POST /api/v1/alerts
-Authorization: Bearer <service_api_key>
-Content-Type: application/json
-```
+### `POST /api/v1/alerts`
+Inbound exception ingestion for monitored targets. Automatically groups matching alerts within a 15-minute sliding window.
+* **Access:** Service API Key (`Authorization: Bearer svc-key-...`)
+* **Request Body:**
+  ```json
+  {
+    "severity": "critical",
+    "title": "Database Connection Pool Exhaustion",
+    "message": "Timed out after 5000ms acquiring client from pool",
+    "stack_trace": "Error: PoolTimeout\n    at Pool.connect (/app/db.js:42:15)",
+    "fingerprint": "db_pool_timeout_worker_01"
+  }
+  ```
+* **Response:** `200 OK` with status `dispatched` or `suppressed_duplicate`.
 
-**Request Body:**
-```json
-{
-  "title": "Unhandled Database Connection Error",
-  "message": "Pool timeout after 5000ms acquiring client connection.",
-  "severity": "critical",
-  "stack_trace": "Error: Pool timeout\n    at Pool.connect (/app/db.js:42:15)"
-}
-```
+### `GET /api/v1/ping/:key`
+Dead-man cron heartbeat ping for internal backup and batch daemons.
+* **Access:** Service API Key in URL path
+* **Response:**
+  ```json
+  {
+    "status": "recorded",
+    "service": "Internal Nightly Backup Cron",
+    "pingRecordedAt": "2026-10-10T01:45:00.000Z"
+  }
+  ```
 
-**Response (200 OK):**
-```json
-{
-  "status": "dispatched",
-  "incidentId": "inc-mv1df5ap",
-  "duplicateSuppressed": false
-}
-```
-
----
-
-### 3.2 Dead-Man's Switch Cron Heartbeat
-```http
-GET /api/v1/ping/:api_key
-```
-
-Signals nominal completion of a background cron job. Resets failure countdown and auto-resolves any open missed-heartbeat incident for the service.
-
-**Response (200 OK):**
-```json
-{
-  "status": "ok",
-  "service": "Internal Nightly Backup Cron",
-  "type": "deadman-cron",
-  "pingRecordedAt": "2026-10-10T00:45:00.000Z"
-}
-```
+### `POST /api/v1/telemetry/errors`
+Passive Sentry-compatible crash telemetry sink for unhandled exceptions across internal services.
+* **Access:** Internal Service API Key or Local Network
+* **Request Body:**
+  ```json
+  {
+    "project": "Crystal-Payment-Worker",
+    "error_type": "FatalStripeWebhookMismatch",
+    "level": "fatal",
+    "message": "Signature verification failed",
+    "stack_trace": "FatalStripeWebhookMismatch\n    at verify (stripe.ts:42:11)",
+    "environment": "production"
+  }
+  ```
 
 ---
 
-### 3.3 Sentry-Style Crash Sink
-```http
-POST /api/v1/telemetry/errors
-Content-Type: application/json
-```
+## 4. Operator Deck & Engine Endpoints (Restricted)
 
-**Request Body:**
-```json
-{
-  "title": "ReferenceError: window is not defined",
-  "message": "Attempted to access window during server-side execution",
-  "stack_trace": "ReferenceError: window is not defined\n    at render (/app/src/entry.js:12:3)",
-  "severity": "error"
-}
-```
+### `POST /api/v1/auth/login`
+2FA-Only operator authentication gate (RFC 6238 TOTP).
+* **Request Body:** `{ "code": "123456" }`
+* **Response:** `{ "token": "jwt-token-string", "expiresIn": 86400 }`
 
-**Response (200 OK):**
-```json
-{
-  "status": "created",
-  "id": "err-dp9mfu6",
-  "count": 1
-}
-```
+### `POST /api/v1/services`
+Registers a new monitored target in the sentinel fleet.
+* **Access:** Operator JWT
 
----
+### `POST /api/v1/services/:id/probe`
+Triggers an immediate synthetic probe for a specific target (`[ PING NOW ]`).
+* **Access:** Operator JWT
 
-## 4. Operator Endpoints (Command & Control)
+### `POST /api/v1/status/settings`
+Updates Uptime Kuma advanced engine parameters, poll intervals, SSL validation flags, and announcement banners.
+* **Access:** Operator JWT
 
-### 4.1 Trigger Instant Probe
-```http
-POST /api/v1/services/:id/probe
-```
-Immediately dispatches a synthetic probe to a single target service and records response telemetry.
-
-**Response (200 OK):**
-```json
-{
-  "id": "svc-781",
-  "name": "Crystal Auth Gateway",
-  "isHealthy": true,
-  "statusCode": 200,
-  "latency_ms": 248,
-  "probedAt": "2026-10-10T00:45:10.000Z"
-}
-```
-
----
-
-### 4.2 Query Multi-Period SLA Analytics
-```http
-GET /api/v1/analytics?timeframe=24h&service_id=<optional_id>
-```
-
-**Response (200 OK):**
-```json
-{
-  "selectedServiceId": null,
-  "allServices": [
-    { "id": "svc-781", "name": "Crystal Auth Gateway", "type": "http-poll" }
-  ],
-  "monitorsBreakdown": [
-    {
-      "id": "svc-781",
-      "name": "Crystal Auth Gateway",
-      "type": "http-poll",
-      "status": "healthy",
-      "uptime24h": 100.0,
-      "uptime7d": 99.95,
-      "uptime30d": 99.98,
-      "currentLatency": 248,
-      "avgLatency": 252,
-      "checksCount24h": 380
-    }
-  ],
-  "percentiles": {
-    "p50": 248,
-    "p95": 412,
-    "p99": 850
-  },
-  "mttrMinutes": 1,
-  "totalChecks24h": 380
-}
-```
-
----
-
-### 4.3 Database Maintenance & Pruning
-```http
-POST /api/v1/status/purge-data
-Content-Type: application/json
-
-{
-  "action": "vacuum" // "purge_resolved_incidents" | "prune_telemetry" | "vacuum"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Telemetry database optimized & synchronized."
-}
-```
+### `POST /api/v1/status/purge-data`
+Executes database maintenance operations:
+* **Actions:** `purge_incidents`, `prune_telemetry`, or `vacuum`.
+* **Access:** Operator JWT
