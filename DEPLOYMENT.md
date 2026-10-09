@@ -9,7 +9,7 @@
 ## 1. Private Infrastructure Prerequisites
 
 Before deploying Crystal Heimdall to internal servers or clouds:
-1. **Repository Access:** Ensure the deployment server has deploy key or SSH access to `git@github.com:Crystal-Studio-Labs/Crystal-Heimdall.git`.
+1. **Repository Access:** Ensure the deployment server has deploy key, SSH, or token access to `https://github.com/SahooShuvranshu/Crystal-Heimdall.git`.
 2. **Secrets Provisioning:** Populate `.env` from the official **Crystal Studio Labs 1Password / Vault** vault. Do not commit `.env`.
 3. **Network Boundary:** 
    * Expose public status endpoints (`/`, `/overview`, `/incidents`, `/docs`) via reverse proxy (Caddy / Nginx).

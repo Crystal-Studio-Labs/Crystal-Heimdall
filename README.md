@@ -20,7 +20,10 @@
 This repository is private. Team members must authenticate via SSH or GitHub CLI with active Crystal Studio Labs organization membership:
 ```bash
 # Clone via SSH (Recommended)
-git clone git@github.com:Crystal-Studio-Labs/Crystal-Heimdall.git
+git clone git@github.com:SahooShuvranshu/Crystal-Heimdall.git
+
+# Or Clone via HTTPS
+git clone https://github.com/SahooShuvranshu/Crystal-Heimdall.git
 cd Crystal-Heimdall
 ```
 
