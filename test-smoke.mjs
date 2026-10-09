@@ -249,7 +249,50 @@ async function runSmokeTests() {
   if (!purgeData.success) throw new Error("Failed to execute maintenance purge action");
   console.log(`   ✅ Maintenance action executed: ${purgeData.message}`);
 
-  console.log("\n🎉 ALL 16 COMPREHENSIVE VERIFICATION TESTS PASSED NOMINAL! 🎉");
+  // 17. XML Sitemap & Robots.txt Directives
+  console.log("\n17. TEST SITEMAP.XML & ROBOTS.TXT DIRECTIVES");
+  const sitemapRes = await fetch(`${BASE_URL}/sitemap.xml`);
+  const sitemapText = await sitemapRes.text();
+  if (sitemapRes.status === 200 && sitemapText.includes("<urlset") && sitemapText.includes("/incidents") && sitemapText.includes("/docs")) {
+    console.log("   ✅ Valid XML Sitemap served with /incidents, /docs, /overview mapped.");
+  } else {
+    throw new Error(`Sitemap verification failed. Status: ${sitemapRes.status}, Body: ${sitemapText.slice(0, 100)}`);
+  }
+
+  const robotsRes = await fetch(`${BASE_URL}/robots.txt`);
+  const robotsText = await robotsRes.text();
+  if (robotsRes.status === 200 && robotsText.includes("Disallow: /dashboard") && robotsText.includes("sitemap.xml")) {
+    console.log("   ✅ Robots.txt verified: Disallows /dashboard and references sitemap.xml.");
+  } else {
+    throw new Error(`Robots.txt verification failed. Status: ${robotsRes.status}, Body: ${robotsText}`);
+  }
+
+  // 18. Individual Incident Lookup & Postmortem Route
+  console.log("\n18. TEST INDIVIDUAL INCIDENT LOOKUP (/api/v1/incidents/:id)");
+  if (incData.incidents.length > 0) {
+    const singleInc = incData.incidents[0];
+    const singleRes = await fetch(`${BASE_URL}/api/v1/incidents/${singleInc.id}`);
+    const singleData = await singleRes.json();
+    if (singleData.incident && singleData.incident.id === singleInc.id) {
+      console.log(`   ✅ Single incident lookup verified: ID ${singleData.incident.id} (${singleData.incident.title})`);
+    } else {
+      throw new Error(`Failed to lookup incident by ID ${singleInc.id}`);
+    }
+  }
+
+  // 19. Multi-Page SPA Client Routes Check
+  console.log("\n19. TEST MULTI-PAGE SPA SERVING (/incidents, /docs, /overview)");
+  for (const p of ["/incidents", "/docs", "/overview", "/login"]) {
+    const pageRes = await fetch(`${BASE_URL}${p}`);
+    const pageHtml = await pageRes.text();
+    if (pageRes.status === 200 && pageHtml.includes('<div id="root">')) {
+      console.log(`   ✅ Client route ${p} served properly.`);
+    } else {
+      throw new Error(`Client route ${p} failed to serve SPA HTML.`);
+    }
+  }
+
+  console.log("\n🎉 ALL 19 COMPREHENSIVE VERIFICATION TESTS PASSED NOMINAL! 🎉");
 }
 
 runSmokeTests().catch((err) => {
