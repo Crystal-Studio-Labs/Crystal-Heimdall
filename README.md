@@ -37,12 +37,28 @@
 | Route | Access | Description |
 |---|---|---|
 | `/` | Public | Real-time status page, announcement banner, 30-day uptime bars, minimal footer. |
+| `/overview` | Public | Architectural overview and platform showcase for Crystal Studio Labs. |
+| `/incidents` | Public | Historical incident ledger with severity/status filters and MTTR metrics. |
+| `/incidents/:id` | Public | Deep-dive postmortem and incident timeline breakdown. |
+| `/docs` | Public | Developer API reference and client code snippets (Node, Python, Go, cURL). |
 | `/login` | Public | 2FA-Only operator authentication gate (6-digit TOTP). |
 | `/dashboard` | Operator | Command deck, monitor cards, instant probe trigger, maintenance mode toggles. |
 | `/dashboard/analytics` | Operator | Uptime Kuma multi-period availability table, monitor filter, latency percentiles. |
 | `/dashboard/settings` | Operator | Status Page editor, Uptime Kuma engine config, notification conduits, maintenance actions. |
+| `/sitemap.xml` | Public | Search engine discovery sitemap with priorities and change frequencies. |
+| `/robots.txt` | Public | Web crawler indexation policies (allows public, disallows /dashboard). |
 | `/manifest.webmanifest` | Public | PWA web app manifest with standalone display configuration. |
 | `/sw.js` | Public | PWA Service Worker caching and background notification handler. |
+
+---
+
+## 📚 Technical Documentation Suite
+
+* [Architecture & System Design](file:///d:/Projects/Crystal-Heimdall/ARCHITECTURE.md) — Subsystems, dual-engine synthetic pollers, database schemas, and brutalist design tokens.
+* [REST API Reference](file:///d:/Projects/Crystal-Heimdall/API.md) — Public, private, telemetry, and operator endpoints.
+* [Deployment Guide](file:///d:/Projects/Crystal-Heimdall/DEPLOYMENT.md) — Bare-metal, PM2, Docker, systemd, and reverse-proxy instructions.
+* [Security Specification](file:///d:/Projects/Crystal-Heimdall/SECURITY.md) — 2FA-only zero-trust architecture, TOTP specs, and secret management.
+* [Sitemap & SEO Catalog](file:///d:/Projects/Crystal-Heimdall/SITEMAP.md) — Complete routing map, SEO metadata audit, Open Graph tags, and Schema.org JSON-LD.
 
 ---
 
