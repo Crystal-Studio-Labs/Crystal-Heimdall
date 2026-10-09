@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { setAuthToken } from "../lib/api";
 import { useToast } from "../lib/ToastContext";
+import SEO from "../components/SEO";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -71,6 +72,12 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#070a0f] text-zinc-100 flex flex-col justify-between font-mono relative overflow-hidden">
+      <SEO 
+        title="Operator Authentication Gate // Crystal Heimdall"
+        description="Direct Two-Factor Authentication (RFC 6238 TOTP) access gate for Crystal Studio Labs infrastructure operators."
+        canonicalPath="/login"
+        noIndex={true}
+      />
       {/* Top Bar */}
       <header className="border-b-2 border-zinc-800 bg-[#070a0f] px-4 sm:px-6 h-14 flex items-center justify-between text-xs">
         <Link to="/" className="text-zinc-400 hover:text-white flex items-center gap-2 transition font-bold">

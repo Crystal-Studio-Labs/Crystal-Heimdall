@@ -2,10 +2,16 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { ShieldAlert, Home, Activity } from "lucide-react";
 import Navbar from "../components/Navbar";
+import SEO from "../components/SEO";
 
 export default function NotFoundPage() {
   return (
     <div className="min-h-screen bg-[#070a0f] text-zinc-100 flex flex-col justify-between font-mono relative overflow-hidden">
+      <SEO 
+        title="Page Not Found (404) // Crystal Heimdall"
+        description="The requested telemetry route or endpoint was not found on Crystal Heimdall."
+        noIndex={true}
+      />
       <Navbar />
 
       <main className="max-w-md w-full mx-auto px-4 py-20 text-center space-y-6 my-auto">

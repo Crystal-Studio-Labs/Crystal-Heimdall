@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar";
 import ServiceCard, { ServiceItem } from "../components/ServiceCard";
 import AddServiceModal from "../components/AddServiceModal";
 import IncidentDrawer, { IncidentItem } from "../components/IncidentDrawer";
+import SEO from "../components/SEO";
 import { 
   ShieldCheck, 
   Plus, 
@@ -329,6 +330,12 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#070a0f] text-zinc-100 flex flex-col font-mono relative overflow-hidden pb-24">
+      <SEO 
+        title="Operator Command Deck // Crystal Heimdall"
+        description="Operator control console for managing synthetic fleet monitors, triggering instant probes, toggling maintenance modes, and triaging Sentry crashes."
+        canonicalPath="/dashboard"
+        noIndex={true}
+      />
       <Navbar />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 space-y-8">

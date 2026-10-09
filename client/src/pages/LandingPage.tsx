@@ -4,14 +4,16 @@ import {
   ArrowRight, 
   Activity, 
   ShieldCheck, 
-  Globe, 
   Zap, 
   Radio, 
   Clock, 
   BellRing,
-  ChevronRight
+  ChevronRight,
+  ShieldAlert,
+  Code2
 } from "lucide-react";
 import Navbar from "../components/Navbar";
+import SEO from "../components/SEO";
 
 interface PublicServicePreview {
   id: string;
@@ -56,13 +58,20 @@ export default function LandingPage() {
   const displayServices = statusInfo.services.length > 0
     ? statusInfo.services
     : [
-        { id: "demo-1", name: "Crystal Studio Platform Gateway", type: "Synthetic HTTP", status: "healthy" as const, latency_ms: 28, uptime_pct: 100.0 },
-        { id: "demo-2", name: "Ecosystem Client Applications", type: "Synthetic HTTP", status: "healthy" as const, latency_ms: 38, uptime_pct: 99.98 },
-        { id: "demo-3", name: "Public Telemetry & Content Edge", type: "Synthetic HTTP", status: "healthy" as const, latency_ms: 19, uptime_pct: 100.0 },
+        { id: "demo-1", name: "Crystal Auth Gateway", type: "Synthetic HTTP", status: "healthy" as const, latency_ms: 28, uptime_pct: 100.0 },
+        { id: "demo-2", name: "Crystal Studio Labs API", type: "Synthetic HTTP", status: "healthy" as const, latency_ms: 38, uptime_pct: 99.98 },
+        { id: "demo-3", name: "Internal Nightly Backup Cron", type: "Dead-Man Cron", status: "healthy" as const, latency_ms: 0, uptime_pct: 100.0 },
       ];
 
   return (
     <div className="min-h-screen bg-[#070a0f] text-zinc-100 flex flex-col justify-between font-mono relative overflow-hidden">
+      <SEO 
+        title="Architecture & Overview // Crystal Heimdall"
+        description="Autonomous reliability sentinel, Uptime Kuma monitoring engine, and Sentry crash tracker designed for Crystal Studio Labs infrastructure."
+        canonicalPath="/overview"
+        keywords={["Architecture", "Overview", "Crystal Heimdall", "Uptime Sentinel", "Crystal Studio Labs"]}
+      />
+
       <Navbar />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-12 pb-20 flex-1 flex flex-col items-center space-y-16">
@@ -81,36 +90,52 @@ export default function LandingPage() {
           {/* Headline - Explicit Brand Claim */}
           <div className="space-y-4">
             <div className="text-xs font-mono tracking-widest text-cyan-400 uppercase font-black">
-              // OFFICIAL INFRASTRUCTURE OBSERVABILITY //
+              // AUTONOMOUS INFRASTRUCTURE OBSERVABILITY //
             </div>
             <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white uppercase leading-none">
-              Uptime Tracker For <br />
+              Crystal Heimdall <br />
               <span className="text-emerald-400 bg-zinc-900 px-3 py-1 border-2 border-emerald-400 inline-block mt-2 shadow-[4px_4px_0px_#000]">
                 Crystal Studio Labs
               </span>
             </h1>
 
             <p className="text-sm sm:text-base text-zinc-400 leading-relaxed max-w-2xl mx-auto font-sans pt-2">
-              Continuous multi-point health monitoring, live probe telemetry, dead-man cron switches, and public transparency reports across all Crystal Studio Labs services.
+              Continuous multi-point health monitoring, live probe telemetry, dead-man cron switches, Sentry crash ingestion, and public transparency reports.
             </p>
           </div>
 
           {/* Action Rocker Buttons */}
-          <div className="flex flex-col sm:flex-row items-center gap-4 pt-2 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2 w-full">
             <Link
-              to="/status"
-              className="w-full sm:w-auto px-8 py-3.5 btn-primary text-xs sm:text-sm flex items-center justify-center space-x-2.5"
+              to="/"
+              className="px-6 py-3.5 btn-primary text-xs sm:text-sm flex items-center justify-center space-x-2"
             >
-              <span>[01] VIEW PUBLIC STATUS PAGE</span>
+              <span>[01] LIVE STATUS PAGE</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
 
             <Link
+              to="/incidents"
+              className="px-6 py-3.5 bg-zinc-900 hover:bg-zinc-800 text-rose-300 hover:text-white border-2 border-zinc-700 hover:border-rose-500 text-xs sm:text-sm font-bold uppercase transition flex items-center justify-center space-x-2 shadow-[3px_3px_0px_#000]"
+            >
+              <ShieldAlert className="w-4 h-4 text-rose-400" />
+              <span>[02] INCIDENT LEDGER</span>
+            </Link>
+
+            <Link
+              to="/docs"
+              className="px-6 py-3.5 bg-zinc-900 hover:bg-zinc-800 text-cyan-300 hover:text-white border-2 border-zinc-700 hover:border-cyan-500 text-xs sm:text-sm font-bold uppercase transition flex items-center justify-center space-x-2 shadow-[3px_3px_0px_#000]"
+            >
+              <Code2 className="w-4 h-4 text-cyan-400" />
+              <span>[03] DEVELOPER API</span>
+            </Link>
+
+            <Link
               to="/login"
-              className="w-full sm:w-auto px-7 py-3.5 btn-secondary text-xs sm:text-sm flex items-center justify-center space-x-2"
+              className="px-6 py-3.5 btn-secondary text-xs sm:text-sm flex items-center justify-center space-x-2"
             >
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>[02] OPERATOR COMMAND DECK</span>
+              <span>[04] OPERATOR CONSOLE</span>
             </Link>
           </div>
         </section>
@@ -127,7 +152,7 @@ export default function LandingPage() {
           </div>
           <div className="p-3 bg-zinc-950 border border-zinc-800">
             <span className="text-zinc-500 text-[10px] uppercase font-bold block">// AUTH PROTOCOL //</span>
-            <span className="text-lg font-black text-emerald-400">2FA + GITHUB</span>
+            <span className="text-lg font-black text-emerald-400">RFC 6238 2FA ONLY</span>
           </div>
           <div className="p-3 bg-zinc-950 border border-zinc-800">
             <span className="text-zinc-500 text-[10px] uppercase font-bold block">// PROBE CADENCE //</span>
@@ -148,9 +173,9 @@ export default function LandingPage() {
                 </span>
               </div>
               <div className="flex items-center space-x-4 text-xs font-mono text-zinc-400">
-                <span>Avg Latency: <strong className="text-emerald-400 font-bold">~28ms</strong></span>
+                <span>Fleet SLA: <strong className="text-emerald-400 font-bold">{statusInfo.avgUptime}%</strong></span>
                 <span className="text-zinc-700">|</span>
-                <span>Probed: <strong className="text-zinc-200">Global Endpoints</strong></span>
+                <span>Probed: <strong className="text-zinc-200">Continuous Synthetics</strong></span>
               </div>
             </div>
 
@@ -184,7 +209,7 @@ export default function LandingPage() {
 
                   <div className="flex items-center space-x-4 text-xs font-mono">
                     <span className="text-emerald-400 font-bold">{item.uptime_pct}%</span>
-                    <span className="text-zinc-400">{item.latency_ms > 0 ? `${item.latency_ms}ms` : "Cron"}</span>
+                    <span className="text-zinc-400">{item.latency_ms > 0 ? `${item.latency_ms}ms` : "Nominal"}</span>
                   </div>
                 </div>
               ))}
@@ -196,33 +221,28 @@ export default function LandingPage() {
                 <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
                 Continuously probing endpoints every 60 seconds
               </span>
-              <Link to="/status" className="text-emerald-400 hover:text-emerald-300 font-bold transition flex items-center gap-1 uppercase">
-                <span>[ OPEN FULL STATUS PAGE ]</span>
+              <Link to="/" className="text-emerald-400 hover:text-emerald-300 font-bold transition flex items-center gap-1 uppercase">
+                <span>[ OPEN LIVE STATUS PAGE ]</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
           </div>
         </section>
 
-        {/* FOUR OBSERVABILITY PILLARS */}
-        <section className="w-full space-y-6">
-          <div className="text-left border-l-4 border-emerald-400 pl-4 space-y-1">
-            <span className="text-xs font-mono uppercase tracking-widest text-emerald-400 font-bold">
-              // OBSERVABILITY CAPABILITIES //
-            </span>
-            <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
-              High-Precision Uptime Infrastructure
-            </h2>
+        {/* 4 FEATURE PILLARS */}
+        <section className="w-full max-w-4xl space-y-4">
+          <div className="text-xs text-zinc-400 font-mono uppercase tracking-wider font-bold">
+            // ARCHITECTURAL CAPABILITIES //
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-[#0b0f17] border-2 border-zinc-800 p-5 space-y-3 shadow-[3px_3px_0px_#000]">
               <div className="w-8 h-8 bg-zinc-900 border border-emerald-500 text-emerald-400 flex items-center justify-center font-bold">
                 01
               </div>
-              <h3 className="font-bold text-white text-sm uppercase">Synthetic Probes</h3>
+              <h3 className="font-bold text-white text-sm uppercase">Active Synthetic Probing</h3>
               <p className="text-xs text-zinc-400 leading-relaxed font-sans">
-                Automated workers test HTTP and WebSocket endpoints every 60 seconds to detect latency spikes.
+                Scheduled round-robin HTTP and TLS pinging validates endpoint availability, latency thresholds, and SSL certificate validity windows.
               </p>
             </div>
 
@@ -230,9 +250,9 @@ export default function LandingPage() {
               <div className="w-8 h-8 bg-zinc-900 border border-cyan-500 text-cyan-400 flex items-center justify-center font-bold">
                 02
               </div>
-              <h3 className="font-bold text-white text-sm uppercase">Public Transparency</h3>
+              <h3 className="font-bold text-white text-sm uppercase">Sentry Crash Sink</h3>
               <p className="text-xs text-zinc-400 leading-relaxed font-sans">
-                Verified 30-day heartbeat logs, incident notices, and uptime percentages displayed at /status.
+                Passive telemetry ingestion captures uncaught promise rejections, frontend stack traces, and worker panics in real-time.
               </p>
             </div>
 
@@ -242,7 +262,7 @@ export default function LandingPage() {
               </div>
               <h3 className="font-bold text-white text-sm uppercase">Alert Dispatches</h3>
               <p className="text-xs text-zinc-400 leading-relaxed font-sans">
-                Instant emergency webhook relays dispatched to Discord and Telegram with 15-minute debounce filters.
+                Instant emergency webhook relays dispatched to Discord and Telegram with 15-minute storm suppression filters.
               </p>
             </div>
 
@@ -252,7 +272,7 @@ export default function LandingPage() {
               </div>
               <h3 className="font-bold text-white text-sm uppercase">Dead-Man's Switch</h3>
               <p className="text-xs text-zinc-400 leading-relaxed font-sans">
-                Background scripts and scheduled jobs ping /api/v1/ping/:key. If a silent worker fails, alarm triggers.
+                Background scripts and scheduled jobs ping /api/v1/ping/:key. If a silent worker fails, an alarm triggers.
               </p>
             </div>
           </div>
@@ -264,13 +284,15 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center space-x-2">
             <span className="w-2 h-2 bg-emerald-400 inline-block" />
-            <span className="text-zinc-200 font-bold uppercase">Uptime Tracker For Crystal Studio Labs</span>
+            <span className="text-zinc-200 font-bold uppercase">Crystal Heimdall</span>
             <span className="text-zinc-600">|</span>
-            <span>Reliability Sentinel</span>
+            <span>Crystal Studio Labs</span>
           </div>
 
-          <div className="flex items-center space-x-6 text-zinc-400">
-            <Link to="/status" className="hover:text-white transition uppercase">[ PUBLIC STATUS ]</Link>
+          <div className="flex flex-wrap items-center gap-4 text-zinc-400">
+            <Link to="/" className="hover:text-white transition uppercase">[ STATUS ]</Link>
+            <Link to="/incidents" className="hover:text-white transition uppercase">[ INCIDENTS ]</Link>
+            <Link to="/docs" className="hover:text-white transition uppercase">[ API DOCS ]</Link>
             <Link to="/login" className="hover:text-white transition uppercase">[ OPERATOR GATE ]</Link>
             <span>&copy; {new Date().getFullYear()} Crystal Studio Labs</span>
           </div>

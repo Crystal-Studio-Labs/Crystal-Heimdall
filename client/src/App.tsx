@@ -1,6 +1,10 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import StatusPage from "./pages/StatusPage";
+import LandingPage from "./pages/LandingPage";
+import IncidentsPage from "./pages/IncidentsPage";
+import IncidentDetailPage from "./pages/IncidentDetailPage";
+import DocsPage from "./pages/DocsPage";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
@@ -25,6 +29,18 @@ export default function App() {
           {/* Public Root & Status Routes */}
           <Route path="/" element={<StatusPage />} />
           <Route path="/status" element={<Navigate to="/" replace />} />
+          <Route path="/overview" element={<LandingPage />} />
+          <Route path="/about" element={<Navigate to="/overview" replace />} />
+
+          {/* Public Incidents Ledger & Detail Routes */}
+          <Route path="/incidents" element={<IncidentsPage />} />
+          <Route path="/incidents/:id" element={<IncidentDetailPage />} />
+
+          {/* Public Developer Reference & Documentation */}
+          <Route path="/docs" element={<DocsPage />} />
+          <Route path="/api-docs" element={<Navigate to="/docs" replace />} />
+
+          {/* Operator Authentication Gate */}
           <Route path="/login" element={<LoginPage />} />
 
           {/* Protected Operator Command Deck Routes */}

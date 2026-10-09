@@ -23,6 +23,7 @@ import {
 import HeartbeatBars, { HistoryBlock } from "../components/HeartbeatBars";
 import { useToast } from "../lib/ToastContext";
 import { isAudioMuted, setAudioMuted, playCriticalAlarm, playTestSound } from "../lib/audioAlerts";
+import SEO from "../components/SEO";
 
 interface PublicService {
   id: string;
@@ -192,6 +193,13 @@ export default function StatusPage() {
 
   return (
     <div className="min-h-screen bg-[#070a0f] text-zinc-100 font-mono pb-24 relative overflow-hidden">
+      <SEO 
+        title={settings.page_title || "Crystal Heimdall // Autonomous Reliability Sentinel"}
+        description={settings.page_description || "Continuous multi-point health monitoring across all public platforms, APIs, and microservices for Crystal Studio Labs."}
+        canonicalPath="/"
+        keywords={["Crystal Heimdall", "Status Page", "Uptime Kuma", "Crystal Studio Labs", "Incident History", "System Health"]}
+      />
+
       {/* Top Header */}
       <header className="border-b-2 border-zinc-800 bg-[#070a0f] sticky top-0 z-30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between text-xs">
@@ -720,14 +728,35 @@ export default function StatusPage() {
               <span>&copy; {new Date().getFullYear()}</span>
             </div>
 
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                to="/incidents"
+                className="text-zinc-400 hover:text-rose-400 text-xs font-bold transition uppercase"
+              >
+                [ INCIDENTS ]
+              </Link>
+
+              <Link
+                to="/overview"
+                className="text-zinc-400 hover:text-cyan-400 text-xs font-bold transition uppercase"
+              >
+                [ OVERVIEW ]
+              </Link>
+
+              <Link
+                to="/docs"
+                className="text-zinc-400 hover:text-purple-400 text-xs font-bold transition uppercase"
+              >
+                [ API DOCS ]
+              </Link>
+
               <a
                 href={settings.support_url || "https://github.com/Crystal-Studio-Labs"}
                 target="_blank"
                 rel="noreferrer"
                 className="text-zinc-400 hover:text-white flex items-center gap-1 font-bold transition text-xs"
               >
-                <span>SUPPORT / GITHUB</span>
+                <span>SUPPORT</span>
                 <ExternalLink className="w-3 h-3" />
               </a>
 

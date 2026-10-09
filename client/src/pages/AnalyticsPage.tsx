@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
+import SEO from "../components/SEO";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, ReferenceLine
@@ -88,6 +89,12 @@ export default function AnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-[#070a0f] text-zinc-100 flex flex-col font-mono relative overflow-hidden pb-24">
+      <SEO 
+        title="Telemetry Analytics & SLA Matrix // Crystal Heimdall"
+        description="Multi-period availability matrix table (24h, 7d, 30d SLAs), response latency percentiles (P50, P95, P99), and MTTR calculations."
+        canonicalPath="/dashboard/analytics"
+        noIndex={true}
+      />
       <Navbar />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 space-y-8">

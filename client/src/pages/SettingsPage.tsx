@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
+import SEO from "../components/SEO";
 import { 
   BellRing, 
   Send, 
@@ -325,6 +326,12 @@ curl -fsS -m 10 --retry 3 https://status.crystalstudio.labs/api/v1/ping/YOUR_API
 
   return (
     <div className="min-h-screen bg-[#070a0f] text-zinc-100 flex flex-col font-mono relative overflow-hidden pb-24">
+      <SEO 
+        title="Control Deck Settings // Crystal Heimdall"
+        description="Configure public status customization, Uptime Kuma poller defaults, TLS/SSL matrices, notification relays, and telemetry lifecycle."
+        canonicalPath="/dashboard/settings"
+        noIndex={true}
+      />
       <Navbar />
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 space-y-8">

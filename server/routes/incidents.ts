@@ -22,6 +22,33 @@ router.get("/", async (_req: Request, res: Response) => {
   }
 });
 
+// GET single incident by ID
+router.get("/:id", async (req: Request, res: Response) => {
+  try {
+    await initDb();
+    const db = getDb();
+    const { id } = req.params;
+    const result = await db.execute({
+      sql: `
+        SELECT i.*, s.name as service_name, s.type as service_type, s.endpoint as service_endpoint
+        FROM incidents i
+        LEFT JOIN services s ON i.service_id = s.id
+        WHERE i.id = ?
+        LIMIT 1
+      `,
+      args: [id],
+    });
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Incident not found" });
+    }
+
+    return res.json({ incident: result.rows[0] });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Failed to fetch incident", details: err.message });
+  }
+});
+
 // POST triage update
 router.post("/:id/ack", async (req: Request, res: Response) => {
   try {

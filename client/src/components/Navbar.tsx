@@ -125,29 +125,91 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* Center Nav for Authenticated Operator (Desktop) */}
-        {isAuthenticated && (
-          <nav className="hidden md:flex items-center space-x-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.path;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`px-3.5 py-2 text-xs font-mono font-bold flex items-center gap-2 border-2 transition-all ${
-                    isActive
-                      ? "bg-zinc-800 text-cyan-300 border-cyan-400 shadow-[2px_2px_0px_#000]"
-                      : "bg-transparent text-zinc-400 border-transparent hover:border-zinc-700 hover:text-white"
-                  }`}
-                >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? "text-cyan-300" : "text-zinc-500"}`} />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-        )}
+        {/* Center Nav for Public & Operator (Desktop) */}
+        <nav className="hidden lg:flex items-center space-x-1">
+          {isAuthenticated ? (
+            <>
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = location.pathname === item.path;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`px-3 py-1.5 text-xs font-mono font-bold flex items-center gap-1.5 border-2 transition-all ${
+                      isActive
+                        ? "bg-zinc-800 text-cyan-300 border-cyan-400 shadow-[2px_2px_0px_#000]"
+                        : "bg-transparent text-zinc-400 border-transparent hover:border-zinc-700 hover:text-white"
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 ${isActive ? "text-cyan-300" : "text-zinc-500"}`} />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+              <span className="text-zinc-700 px-1">|</span>
+              <Link
+                to="/incidents"
+                className={`px-2.5 py-1.5 text-xs font-mono font-bold transition ${
+                  location.pathname === "/incidents" ? "text-rose-300" : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                INCIDENTS
+              </Link>
+              <Link
+                to="/docs"
+                className={`px-2.5 py-1.5 text-xs font-mono font-bold transition ${
+                  location.pathname === "/docs" ? "text-cyan-300" : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                DOCS
+              </Link>
+            </>
+          ) : (
+            <div className="flex items-center space-x-1 text-xs font-mono font-bold">
+              <Link
+                to="/"
+                className={`px-3 py-1.5 border transition ${
+                  location.pathname === "/"
+                    ? "bg-zinc-900 border-emerald-500 text-emerald-400"
+                    : "border-transparent text-zinc-400 hover:text-white hover:border-zinc-800"
+                }`}
+              >
+                STATUS
+              </Link>
+              <Link
+                to="/incidents"
+                className={`px-3 py-1.5 border transition ${
+                  location.pathname === "/incidents"
+                    ? "bg-zinc-900 border-rose-500 text-rose-300"
+                    : "border-transparent text-zinc-400 hover:text-white hover:border-zinc-800"
+                }`}
+              >
+                INCIDENTS
+              </Link>
+              <Link
+                to="/overview"
+                className={`px-3 py-1.5 border transition ${
+                  location.pathname === "/overview"
+                    ? "bg-zinc-900 border-cyan-500 text-cyan-300"
+                    : "border-transparent text-zinc-400 hover:text-white hover:border-zinc-800"
+                }`}
+              >
+                OVERVIEW
+              </Link>
+              <Link
+                to="/docs"
+                className={`px-3 py-1.5 border transition ${
+                  location.pathname === "/docs"
+                    ? "bg-zinc-900 border-purple-500 text-purple-300"
+                    : "border-transparent text-zinc-400 hover:text-white hover:border-zinc-800"
+                }`}
+              >
+                API DOCS
+              </Link>
+            </div>
+          )}
+        </nav>
 
         {/* Right Actions (Desktop) */}
         <div className="hidden md:flex items-center space-x-3">
@@ -220,8 +282,32 @@ export default function Navbar() {
               onClick={() => setMobileMenuOpen(false)}
               className="block px-3 py-2 bg-zinc-900 border border-zinc-700 text-zinc-200 text-center font-bold"
             >
-              PUBLIC STATUS PAGE
+              [ LIVE STATUS ]
             </Link>
+
+            <div className="grid grid-cols-3 gap-2">
+              <Link
+                to="/incidents"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-2 py-1.5 bg-zinc-950 border border-zinc-800 text-rose-300 text-center font-bold"
+              >
+                INCIDENTS
+              </Link>
+              <Link
+                to="/overview"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-2 py-1.5 bg-zinc-950 border border-zinc-800 text-cyan-300 text-center font-bold"
+              >
+                OVERVIEW
+              </Link>
+              <Link
+                to="/docs"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-2 py-1.5 bg-zinc-950 border border-zinc-800 text-purple-300 text-center font-bold"
+              >
+                API DOCS
+              </Link>
+            </div>
 
             {isAuthenticated ? (
               <button
