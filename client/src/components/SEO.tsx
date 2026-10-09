@@ -29,7 +29,7 @@ export default function SEO({
   ],
   canonicalPath = "/",
   ogType = "website",
-  ogImage = "/og-image.svg",
+  ogImage = "/og-image.png",
   noIndex = false,
   jsonLd
 }: SEOProps) {

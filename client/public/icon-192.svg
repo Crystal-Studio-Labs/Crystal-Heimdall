@@ -1,9 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
-  <rect width="192" height="192" fill="#08090b"/>
-  <rect x="8" y="8" width="176" height="176" fill="none" stroke="#27272a" stroke-width="4"/>
-  <rect x="14" y="14" width="164" height="164" fill="none" stroke="#34d399" stroke-width="2"/>
-  <!-- Industrial Lightning Bolt / Radar Glyphs -->
-  <polygon points="108,24 52,104 96,104 84,168 140,88 96,88" fill="#34d399"/>
-  <!-- Monospace Subtext Stamp -->
-  <text x="96" y="180" font-family="monospace" font-size="12" font-weight="900" fill="#a1a1aa" text-anchor="middle" letter-spacing="2">UPTIME</text>
+  <rect width="192" height="192" fill="#070a0f"/>
+  <rect x="6" y="6" width="180" height="180" fill="none" stroke="#27272a" stroke-width="4"/>
+  <rect x="12" y="12" width="168" height="168" fill="none" stroke="#10b981" stroke-width="2"/>
+  
+  <!-- Corner Brackets -->
+  <path d="M 12 28 L 12 12 L 28 12" stroke="#10b981" stroke-width="3" fill="none"/>
+  <path d="M 180 28 L 180 12 L 164 12" stroke="#10b981" stroke-width="3" fill="none"/>
+  <path d="M 12 164 L 12 180 L 28 180" stroke="#10b981" stroke-width="3" fill="none"/>
+  <path d="M 180 164 L 180 180 L 164 180" stroke="#10b981" stroke-width="3" fill="none"/>
+
+  <!-- Industrial Activity Pulse & Bolt -->
+  <polygon points="106,24 56,98 96,98 86,160 136,86 96,86" fill="#10b981"/>
+  
+  <!-- Monospace Header & Footer Stamps -->
+  <text x="96" y="24" font-family="'JetBrains Mono', monospace, sans-serif" font-size="9" font-weight="900" fill="#71717a" text-anchor="middle" letter-spacing="2">CRYSTAL</text>
+  <text x="96" y="174" font-family="'JetBrains Mono', monospace, sans-serif" font-size="11" font-weight="900" fill="#38bdf8" text-anchor="middle" letter-spacing="3">HEIMDALL</text>
 </svg>

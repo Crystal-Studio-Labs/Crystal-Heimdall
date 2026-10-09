@@ -292,7 +292,30 @@ async function runSmokeTests() {
     }
   }
 
-  console.log("\n🎉 ALL 19 COMPREHENSIVE VERIFICATION TESTS PASSED NOMINAL! 🎉");
+  // 20. Static Brand & PWA Asset Integrity
+  console.log("\n20. TEST STATIC ASSETS INTEGRITY (Favicon, PWA PNGs, OG Images, Banner SVG)");
+  const requiredAssets = [
+    "/favicon.ico",
+    "/favicon.svg",
+    "/icon-192.png",
+    "/icon-192.svg",
+    "/icon-512.png",
+    "/icon-512.svg",
+    "/apple-touch-icon.png",
+    "/og-image.png",
+    "/og-image.svg",
+    "/banner.svg"
+  ];
+  for (const assetPath of requiredAssets) {
+    const assetRes = await fetch(`${BASE_URL}${assetPath}`);
+    if (assetRes.status === 200 && assetRes.headers.get("content-length") !== "0") {
+      console.log(`   ✅ Asset verified: ${assetPath} (${assetRes.headers.get("content-type")})`);
+    } else {
+      throw new Error(`Asset verification failed for ${assetPath}: status=${assetRes.status}`);
+    }
+  }
+
+  console.log("\n🎉 ALL 20 COMPREHENSIVE VERIFICATION TESTS PASSED NOMINAL! 🎉");
 }
 
 runSmokeTests().catch((err) => {
