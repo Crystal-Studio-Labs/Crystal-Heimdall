@@ -9,8 +9,8 @@ dist-server/
 
 # Env & Secrets
 .env
-.env.local
-.env.production
+.env.*
+!.env.example
 *.pem
 qr-*.png
 

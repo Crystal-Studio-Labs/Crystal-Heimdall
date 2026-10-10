@@ -7,6 +7,9 @@ import { getDb, initDb } from "../db.js";
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "crystal_heimdall_super_secret_jwt_key_2026";
 
+// Allow ±1 time-step window (±30s) to handle mobile device clock skew & network latency
+authenticator.options = { window: 1 };
+
 // Check if 2FA has been permanently paired/locked
 export async function is2FaLocked(): Promise<boolean> {
   // If TOTP_SECRET is provisioned via environment variable, it is locked

@@ -99,7 +99,18 @@ app.all("/api/v1/ping/:key", async (req, res) => {
 });
 
 // Manual / Cron trigger for synthetic poll (Vercel Cron endpoint)
-app.get("/api/v1/cron/poll", async (_req, res) => {
+app.get("/api/v1/cron/poll", async (req, res) => {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && cronSecret.trim().length > 0) {
+    const authHeader = req.headers.authorization;
+    const querySecret = req.query.secret as string | undefined;
+    const isBearerValid = authHeader === `Bearer ${cronSecret.trim()}`;
+    const isQueryValid = querySecret === cronSecret.trim();
+    if (!isBearerValid && !isQueryValid) {
+      return res.status(401).json({ error: "Unauthorized cron trigger" });
+    }
+  }
+
   try {
     const result = await runPollCycle();
     return res.json({ timestamp: new Date().toISOString(), summary: result });
