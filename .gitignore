@@ -12,6 +12,7 @@ dist-server/
 .env.local
 .env.production
 *.pem
+qr-*.png
 
 # Data
 data/*.db
