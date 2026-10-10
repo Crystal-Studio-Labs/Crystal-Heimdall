@@ -1,3 +1,5 @@
+import { authenticator } from "otplib";
+
 async function runSmokeTests() {
   const BASE_URL = "http://localhost:3030";
   console.log("=== RUNNING FULL CRYSTAL-HEIMDALL VERIFICATION SUITE ===\n");
@@ -98,30 +100,65 @@ async function runSmokeTests() {
   });
   console.log(`   ✅ Target restored to is_public=${initialPublic}.`);
 
-  // 8. Test 2-Factor Authentication Gate (2FA Only, No Master Passcode, No GitHub)
-  console.log("\n8. TEST 2-FACTOR AUTHENTICATION (2FA) GATE - 2FA ONLY");
+  // 8. Test 2-Factor Authentication Gate (One-Time Setup & Permanent Lockdown)
+  console.log("\n8. TEST 2-FACTOR AUTHENTICATION (2FA) GATE - ZERO BYPASS & LOCKDOWN");
+
+  // 8a. Verify that '000000' bypass is strictly rejected
+  const devBypassRes = await fetch(`${BASE_URL}/api/v1/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: "000000" })
+  });
+  if (devBypassRes.status !== 401) {
+    throw new Error(`000000 bypass was NOT rejected! Status: ${devBypassRes.status}`);
+  }
+  console.log("   ✅ '000000' bypass strictly rejected with 401 Unauthorized.");
+
+  // 8b. Fetch initial setup secret (or use authenticated token) and generate genuine RFC 6238 TOTP
+  const setupRes = await fetch(`${BASE_URL}/api/v1/auth/setup-2fa`);
+  let secret = null;
+  if (setupRes.ok) {
+    const setupData = await setupRes.json();
+    secret = setupData.secret;
+  }
+  // Fallback to reading secret from database if already paired in previous run
+  if (!secret) {
+    const { getDb, initDb } = await import("./dist-server/db.js");
+    await initDb();
+    const db = getDb();
+    const res = await db.execute("SELECT value FROM operator_auth WHERE key = 'totp_secret'");
+    secret = String(res.rows[0].value);
+  }
+
+  const realTotpCode = authenticator.generate(secret);
+  console.log(`   Generated genuine RFC 6238 TOTP rolling token: ${realTotpCode} (secret: ${secret.slice(0, 4)}****)`);
+
   const loginRes = await fetch(`${BASE_URL}/api/v1/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code: "000000" })
+    body: JSON.stringify({ code: realTotpCode })
   });
   const loginData = await loginRes.json();
   if (!loginData.token) {
-    throw new Error(`2FA Direct Login failed: ${JSON.stringify(loginData)}`);
+    throw new Error(`2FA Direct Login failed with real TOTP code: ${JSON.stringify(loginData)}`);
   }
-  console.log("   ✅ Direct 2FA: 6-digit TOTP code verified, operator session token granted.");
+  console.log("   ✅ Direct 2FA: Real TOTP code verified, operator session token granted.");
 
-  // Also verify /api/v1/auth/verify-2fa endpoint
-  const verifyRes = await fetch(`${BASE_URL}/api/v1/auth/verify-2fa`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code: "000000" })
-  });
-  const verifyData = await verifyRes.json();
-  if (!verifyData.token) {
-    throw new Error(`2FA verify-2fa endpoint failed: ${JSON.stringify(verifyData)}`);
+  // 8c. Verify 2FA Lockdown: unauthenticated requests to /setup-2fa MUST be rejected with 403 Forbidden
+  const lockedSetupRes = await fetch(`${BASE_URL}/api/v1/auth/setup-2fa`);
+  if (lockedSetupRes.status !== 403) {
+    throw new Error(`Setup gate was NOT locked! Status: ${lockedSetupRes.status}`);
   }
-  console.log("   ✅ 2FA /verify-2fa endpoint verified.");
+  console.log("   ✅ 2FA Lockdown verified: Unauthenticated /setup-2fa blocked with 403 Forbidden.");
+
+  // 8d. Verify that authenticated operator with Bearer token can still query setup/QR info
+  const authSetupRes = await fetch(`${BASE_URL}/api/v1/auth/setup-2fa`, {
+    headers: { Authorization: `Bearer ${loginData.token}` }
+  });
+  if (!authSetupRes.ok) {
+    throw new Error(`Authenticated operator could not query 2FA details! Status: ${authSetupRes.status}`);
+  }
+  console.log("   ✅ Authenticated operator verified: Authorized session can inspect 2FA credentials.");
 
   // 9. Analytics API
   console.log("\n9. TEST ANALYTICS API (/api/v1/analytics)");

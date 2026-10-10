@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { 
   ShieldCheck, 
@@ -22,10 +22,29 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 2FA Lock status (Once paired or deployed, setup is permanently sealed)
+  const [isLocked, setIsLocked] = useState(true);
+  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
+
   // 2FA QR Setup Modal state
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrData, setQrData] = useState<{ qrDataUrl: string; secret: string } | null>(null);
   const [copiedSecret, setCopiedSecret] = useState(false);
+
+  // Check 2FA lockdown status on mount
+  useEffect(() => {
+    fetch("/api/v1/auth/status")
+      .then((r) => r.json())
+      .then((data) => {
+        setIsLocked(Boolean(data.isLocked));
+      })
+      .catch(() => {
+        setIsLocked(true);
+      })
+      .finally(() => {
+        setIsLoadingStatus(false);
+      });
+  }, []);
 
   // Submit 6-digit TOTP code directly (2FA Only)
   const handleSubmit2Fa = async (e: React.FormEvent) => {
@@ -56,7 +75,7 @@ export default function LoginPage() {
     }
   };
 
-  // Fetch 2FA Setup QR Code
+  // Fetch 2FA Setup QR Code (Available ONLY during initial setup)
   const handleFetchQrSetup = async () => {
     try {
       const res = await fetch("/api/v1/auth/setup-2fa");
@@ -64,6 +83,8 @@ export default function LoginPage() {
         const json = await res.json();
         setQrData(json);
         setShowQrModal(true);
+      } else {
+        toast.error("2FA is permanently initialized and locked.");
       }
     } catch {
       toast.error("Failed to load 2FA configuration");
@@ -86,7 +107,7 @@ export default function LoginPage() {
         </Link>
         <div className="flex items-center space-x-2 text-[11px] font-bold text-emerald-400">
           <span className="w-1.5 h-1.5 bg-emerald-400 inline-block animate-pulse" />
-          <span>[ AUTH_PROTOCOL: 2FA_ONLY ]</span>
+          <span>{isLocked ? "[ AUTH_PROTOCOL: 2FA_LOCKED ]" : "[ AUTH_PROTOCOL: 2FA_SETUP_PENDING ]"}</span>
         </div>
       </header>
 
@@ -105,7 +126,9 @@ export default function LoginPage() {
               Two-Factor Authentication
             </h1>
             <p className="text-xs text-zinc-400 font-sans leading-relaxed">
-              Enter the rolling 6-digit TOTP code from your authenticator app (Google Authenticator, Ente Auth, 1Password).
+              {isLocked 
+                ? "Enter the rolling 6-digit TOTP code from your paired authenticator app."
+                : "Initial setup required. Pair your authenticator app below before deploying."}
             </p>
           </div>
 
@@ -121,15 +144,29 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit2Fa} className="space-y-5">
             <div className="space-y-2">
               <div className="flex items-center justify-between text-[10px] text-zinc-400 font-bold">
-                <span>// 6-DIGIT AUTHENTICATOR CODE //</span>
-                <span className="text-emerald-400">DEV CODE: 000000</span>
+                <span>// 6-DIGIT ROLLING TOTP CODE //</span>
+                {!isLocked ? (
+                  <button
+                    type="button"
+                    onClick={handleFetchQrSetup}
+                    className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 flex items-center gap-1 font-mono transition"
+                  >
+                    <QrCode className="w-3 h-3" />
+                    <span>[ PAIR / SCAN QR ]</span>
+                  </button>
+                ) : (
+                  <span className="text-zinc-500 font-mono flex items-center gap-1 text-[10px]">
+                    <Lock className="w-3 h-3 text-emerald-400" />
+                    <span>[ ENFORCED ]</span>
+                  </span>
+                )}
               </div>
               <input
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 maxLength={6}
-                placeholder="000000"
+                placeholder="------"
                 value={totpCode}
                 onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
                 className="w-full p-3.5 bg-black border-2 border-emerald-500/80 text-emerald-400 font-mono text-center tracking-[0.6em] text-3xl font-black shadow-[inset_2px_2px_0px_#000] outline-none focus:border-cyan-400"
@@ -146,26 +183,34 @@ export default function LoginPage() {
               <ShieldCheck className="w-4 h-4" />
             </button>
 
+            {/* Bottom Bar: If setup is still pending, show pair trigger. If locked, hide setup trigger completely */}
             <div className="pt-3 border-t-2 border-zinc-800 flex items-center justify-between text-xs">
-              <button
-                type="button"
-                onClick={handleFetchQrSetup}
-                className="text-cyan-400 hover:text-cyan-300 font-mono flex items-center gap-1.5 font-bold"
-              >
-                <QrCode className="w-3.5 h-3.5" />
-                <span>Pair / Show QR Code</span>
-              </button>
+              {!isLocked ? (
+                <button
+                  type="button"
+                  onClick={handleFetchQrSetup}
+                  className="text-cyan-400 hover:text-cyan-300 font-mono flex items-center gap-1.5 font-bold"
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  <span>One-Time Pairing Setup</span>
+                </button>
+              ) : (
+                <span className="text-zinc-500 font-mono flex items-center gap-1.5 text-[11px]">
+                  <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>2FA Locked • Deployed Guard</span>
+                </span>
+              )}
 
-              <span className="text-[10px] text-zinc-500">
-                Auto-rotates every 30s
+              <span className="text-[10px] text-zinc-500 font-mono">
+                RFC 6238 • 30s Steps
               </span>
             </div>
           </form>
         </div>
       </main>
 
-      {/* 2FA SETUP MODAL */}
-      {showQrModal && qrData && (
+      {/* 2FA ONE-TIME SETUP MODAL */}
+      {showQrModal && qrData && !isLocked && (
         <div 
           className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 font-mono text-xs"
           onClick={(e) => {
@@ -176,7 +221,7 @@ export default function LoginPage() {
             <div className="flex items-center justify-between border-b-2 border-zinc-800 pb-3">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-emerald-400" />
-                <span className="font-bold text-white text-xs uppercase font-mono">Pair Authenticator</span>
+                <span className="font-bold text-white text-xs uppercase font-mono">One-Time 2FA Pairing</span>
               </div>
               <button
                 onClick={() => setShowQrModal(false)}
@@ -191,7 +236,7 @@ export default function LoginPage() {
             </div>
 
             <p className="text-[11px] text-zinc-400 font-sans leading-relaxed text-center">
-              Scan this QR code with Google Authenticator, Ente Auth, or 1Password to link your device.
+              Scan this QR code with Google Authenticator, Ente Auth, or 1Password to link your device. Once logged in, setup is permanently sealed.
             </p>
 
             <div className="space-y-1">
@@ -216,7 +261,7 @@ export default function LoginPage() {
               onClick={() => setShowQrModal(false)}
               className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white font-mono text-xs font-bold border border-zinc-600 uppercase"
             >
-              [ CLOSE / RETURN TO LOGIN ]
+              [ CLOSE / ENTER 6-DIGIT CODE ]
             </button>
           </div>
         </div>

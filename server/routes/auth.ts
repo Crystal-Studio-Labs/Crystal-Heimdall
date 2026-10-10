@@ -7,15 +7,31 @@ import { getDb, initDb } from "../db.js";
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "crystal_heimdall_super_secret_jwt_key_2026";
 
+// Check if 2FA has been permanently paired/locked
+export async function is2FaLocked(): Promise<boolean> {
+  // If TOTP_SECRET is provisioned via environment variable, it is locked
+  if (process.env.TOTP_SECRET && process.env.TOTP_SECRET.trim().length > 0) {
+    return true;
+  }
+  const db = getDb();
+  const res = await db.execute("SELECT value FROM operator_auth WHERE key = 'totp_paired'");
+  return res.rows.length > 0 && String(res.rows[0].value) === "1";
+}
+
 // Get or initialize TOTP secret
-async function getTotpSecret(): Promise<string> {
+export async function getTotpSecret(): Promise<string> {
+  // 1. Environment variable override (highest priority, locked)
+  if (process.env.TOTP_SECRET && process.env.TOTP_SECRET.trim().length > 0) {
+    return process.env.TOTP_SECRET.trim();
+  }
+
   const db = getDb();
   const res = await db.execute("SELECT value FROM operator_auth WHERE key = 'totp_secret'");
   if (res.rows.length > 0 && res.rows[0].value) {
     return String(res.rows[0].value);
   }
 
-  // Generate new secret
+  // Generate new secret for initial setup
   const newSecret = authenticator.generateSecret();
   await db.execute({
     sql: "INSERT OR REPLACE INTO operator_auth (key, value) VALUES ('totp_secret', ?)",
@@ -24,7 +40,18 @@ async function getTotpSecret(): Promise<string> {
   return newSecret;
 }
 
-// 1. Direct 2FA-Only Login (No master passcode, No GitHub)
+// 0. Public 2FA Lock Status Endpoint
+router.get("/status", async (_req: Request, res: Response) => {
+  try {
+    await initDb();
+    const locked = await is2FaLocked();
+    return res.json({ isLocked: locked });
+  } catch {
+    return res.json({ isLocked: true });
+  }
+});
+
+// 1. Direct 2FA-Only Login (Zero master passcode, Zero OAuth)
 router.post("/login", async (req: Request, res: Response) => {
   try {
     await initDb();
@@ -38,12 +65,19 @@ router.post("/login", async (req: Request, res: Response) => {
     const secret = await getTotpSecret();
     const isValid = authenticator.check(finalCode, secret);
 
-    // Development bypass code '000000' if secret not yet paired
-    if (!isValid && finalCode !== "000000") {
+    // ZERO bypass allowed. 000000 is strictly rejected.
+    if (!isValid) {
       return res.status(401).json({ error: "Invalid 6-digit code. Check your authenticator app." });
     }
 
-    // Direct authorization granted -> Issue session JWT (valid for 30 days)
+    // Permanently seal and lock 2FA upon first successful verification
+    const db = getDb();
+    await db.execute({
+      sql: "INSERT OR REPLACE INTO operator_auth (key, value) VALUES ('totp_paired', '1')",
+      args: [],
+    });
+
+    // Issue session JWT (valid for 30 days)
     const sessionToken = jwt.sign({ operator: "Operator", authenticated: true }, JWT_SECRET, {
       expiresIn: "30d",
     });
@@ -53,13 +87,14 @@ router.post("/login", async (req: Request, res: Response) => {
       token: sessionToken,
       operator: "Operator",
       message: "2FA Verified. Operator session authorized.",
+      isLocked: true,
     });
   } catch (err: any) {
     return res.status(500).json({ error: "2FA authentication failed", details: err.message });
   }
 });
 
-// 2. Direct verify-2fa endpoint (alias for direct 2FA verification)
+// 2. Direct verify-2fa endpoint
 router.post("/verify-2fa", async (req: Request, res: Response) => {
   try {
     await initDb();
@@ -73,9 +108,16 @@ router.post("/verify-2fa", async (req: Request, res: Response) => {
     const secret = await getTotpSecret();
     const isValid = authenticator.check(finalCode, secret);
 
-    if (!isValid && finalCode !== "000000") {
+    if (!isValid) {
       return res.status(401).json({ error: "Invalid 6-digit code. Check your authenticator app." });
     }
+
+    // Permanently seal and lock 2FA
+    const db = getDb();
+    await db.execute({
+      sql: "INSERT OR REPLACE INTO operator_auth (key, value) VALUES ('totp_paired', '1')",
+      args: [],
+    });
 
     const sessionToken = jwt.sign({ operator: "Operator", authenticated: true }, JWT_SECRET, {
       expiresIn: "30d",
@@ -85,21 +127,46 @@ router.post("/verify-2fa", async (req: Request, res: Response) => {
       success: true,
       token: sessionToken,
       operator: "Operator",
+      isLocked: true,
     });
   } catch (err: any) {
     return res.status(500).json({ error: "2FA verification failed", details: err.message });
   }
 });
 
-// 3. Setup 2FA QR Code (Generates scanable QR for Ente Auth / Google Auth / 1Password)
-router.get("/setup-2fa", async (_req: Request, res: Response) => {
+// 3. Setup 2FA QR Code (ONE-TIME ONLY: Sealed once paired or deployed)
+router.get("/setup-2fa", async (req: Request, res: Response) => {
   try {
     await initDb();
+    const locked = await is2FaLocked();
+
+    // Check if operator is already authenticated with valid JWT
+    const authHeader = req.headers.authorization;
+    let isAuthenticated = false;
+    if (authHeader) {
+      try {
+        const token = authHeader.replace(/^Bearer\s+/i, "");
+        jwt.verify(token, JWT_SECRET);
+        isAuthenticated = true;
+      } catch {
+        isAuthenticated = false;
+      }
+    }
+
+    // If 2FA has been paired/locked, deny unauthenticated visitors
+    if (locked && !isAuthenticated) {
+      return res.status(403).json({
+        error: "2FA is permanently initialized and locked. Pairing setup is disabled on deployed instances.",
+        isLocked: true,
+      });
+    }
+
     const secret = await getTotpSecret();
     const otpauth = authenticator.keyuri("Operator", "CrystalStudioLabs-Heimdall", secret);
     const qrDataUrl = await qrcode.toDataURL(otpauth);
 
     return res.json({
+      isLocked: locked,
       secret,
       qrDataUrl,
       otpauth,
