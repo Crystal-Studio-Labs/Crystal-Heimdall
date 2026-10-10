@@ -1,13 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { 
   ShieldCheck, 
-  QrCode, 
   ArrowLeft, 
-  Copy, 
-  Check, 
   AlertCircle,
-  KeyRound,
   Lock
 } from "lucide-react";
 import { setAuthToken } from "../lib/api";
@@ -22,31 +18,7 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 2FA Lock status (Once paired or deployed, setup is permanently sealed)
-  const [isLocked, setIsLocked] = useState(true);
-  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
-
-  // 2FA QR Setup Modal state
-  const [showQrModal, setShowQrModal] = useState(false);
-  const [qrData, setQrData] = useState<{ qrDataUrl: string; secret: string } | null>(null);
-  const [copiedSecret, setCopiedSecret] = useState(false);
-
-  // Check 2FA lockdown status on mount
-  useEffect(() => {
-    fetch("/api/v1/auth/status")
-      .then((r) => r.json())
-      .then((data) => {
-        setIsLocked(Boolean(data.isLocked));
-      })
-      .catch(() => {
-        setIsLocked(true);
-      })
-      .finally(() => {
-        setIsLoadingStatus(false);
-      });
-  }, []);
-
-  // Submit 6-digit TOTP code directly (2FA Only)
+  // Submit 6-digit TOTP code directly (2FA Enforced)
   const handleSubmit2Fa = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage("");
@@ -75,22 +47,6 @@ export default function LoginPage() {
     }
   };
 
-  // Fetch 2FA Setup QR Code (Available ONLY during initial setup)
-  const handleFetchQrSetup = async () => {
-    try {
-      const res = await fetch("/api/v1/auth/setup-2fa");
-      if (res.ok) {
-        const json = await res.json();
-        setQrData(json);
-        setShowQrModal(true);
-      } else {
-        toast.error("2FA is permanently initialized and locked.");
-      }
-    } catch {
-      toast.error("Failed to load 2FA configuration");
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#070a0f] text-zinc-100 flex flex-col justify-between font-mono relative overflow-hidden">
       <SEO 
@@ -107,7 +63,7 @@ export default function LoginPage() {
         </Link>
         <div className="flex items-center space-x-2 text-[11px] font-bold text-emerald-400">
           <span className="w-1.5 h-1.5 bg-emerald-400 inline-block animate-pulse" />
-          <span>{isLocked ? "[ AUTH_PROTOCOL: 2FA_LOCKED ]" : "[ AUTH_PROTOCOL: 2FA_SETUP_PENDING ]"}</span>
+          <span>[ AUTH_PROTOCOL: 2FA_ENFORCED ]</span>
         </div>
       </header>
 
@@ -126,9 +82,7 @@ export default function LoginPage() {
               Two-Factor Authentication
             </h1>
             <p className="text-xs text-zinc-400 font-sans leading-relaxed">
-              {isLocked 
-                ? "Enter the rolling 6-digit TOTP code from your paired authenticator app."
-                : "Initial setup required. Pair your authenticator app below before deploying."}
+              Enter the rolling 6-digit TOTP code from your paired authenticator app (Google Authenticator, Ente Auth, 1Password).
             </p>
           </div>
 
@@ -145,21 +99,10 @@ export default function LoginPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-[10px] text-zinc-400 font-bold">
                 <span>// 6-DIGIT ROLLING TOTP CODE //</span>
-                {!isLocked ? (
-                  <button
-                    type="button"
-                    onClick={handleFetchQrSetup}
-                    className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 flex items-center gap-1 font-mono transition"
-                  >
-                    <QrCode className="w-3 h-3" />
-                    <span>[ PAIR / SCAN QR ]</span>
-                  </button>
-                ) : (
-                  <span className="text-zinc-500 font-mono flex items-center gap-1 text-[10px]">
-                    <Lock className="w-3 h-3 text-emerald-400" />
-                    <span>[ ENFORCED ]</span>
-                  </span>
-                )}
+                <span className="text-emerald-400 font-mono flex items-center gap-1 text-[10px]">
+                  <Lock className="w-3 h-3 text-emerald-400" />
+                  <span>[ LOCKED & ACTIVE ]</span>
+                </span>
               </div>
               <input
                 type="text"
@@ -183,23 +126,12 @@ export default function LoginPage() {
               <ShieldCheck className="w-4 h-4" />
             </button>
 
-            {/* Bottom Bar: If setup is still pending, show pair trigger. If locked, hide setup trigger completely */}
+            {/* Bottom Bar: Secure Lockdown indicators */}
             <div className="pt-3 border-t-2 border-zinc-800 flex items-center justify-between text-xs">
-              {!isLocked ? (
-                <button
-                  type="button"
-                  onClick={handleFetchQrSetup}
-                  className="text-cyan-400 hover:text-cyan-300 font-mono flex items-center gap-1.5 font-bold"
-                >
-                  <QrCode className="w-3.5 h-3.5" />
-                  <span>One-Time Pairing Setup</span>
-                </button>
-              ) : (
-                <span className="text-zinc-500 font-mono flex items-center gap-1.5 text-[11px]">
-                  <Lock className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>2FA Locked • Deployed Guard</span>
-                </span>
-              )}
+              <span className="text-zinc-500 font-mono flex items-center gap-1.5 text-[11px]">
+                <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Pairing Sealed • Deployed Guard</span>
+              </span>
 
               <span className="text-[10px] text-zinc-500 font-mono">
                 RFC 6238 • 30s Steps
@@ -208,64 +140,6 @@ export default function LoginPage() {
           </form>
         </div>
       </main>
-
-      {/* 2FA ONE-TIME SETUP MODAL */}
-      {showQrModal && qrData && !isLocked && (
-        <div 
-          className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 font-mono text-xs"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowQrModal(false);
-          }}
-        >
-          <div className="bg-[#0b0f17] border-2 border-zinc-600 shadow-[6px_6px_0px_#000] p-6 max-w-sm w-full space-y-4">
-            <div className="flex items-center justify-between border-b-2 border-zinc-800 pb-3">
-              <div className="flex items-center gap-2">
-                <KeyRound className="w-4 h-4 text-emerald-400" />
-                <span className="font-bold text-white text-xs uppercase font-mono">One-Time 2FA Pairing</span>
-              </div>
-              <button
-                onClick={() => setShowQrModal(false)}
-                className="text-zinc-500 hover:text-white font-mono text-sm"
-              >
-                [X]
-              </button>
-            </div>
-
-            <div className="flex justify-center p-3 bg-white border border-zinc-700">
-              <img src={qrData.qrDataUrl} alt="2FA QR Code" className="w-44 h-44" />
-            </div>
-
-            <p className="text-[11px] text-zinc-400 font-sans leading-relaxed text-center">
-              Scan this QR code with Google Authenticator, Ente Auth, or 1Password to link your device. Once logged in, setup is permanently sealed.
-            </p>
-
-            <div className="space-y-1">
-              <span className="text-[10px] text-zinc-500 font-mono block font-bold uppercase">// MANUAL SECRET KEY //</span>
-              <div className="p-2.5 bg-black border border-zinc-800 text-[11px] font-mono text-emerald-400 flex items-center justify-between">
-                <span className="truncate">{qrData.secret}</span>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(qrData.secret);
-                    setCopiedSecret(true);
-                    setTimeout(() => setCopiedSecret(false), 2000);
-                  }}
-                  className="ml-2 text-zinc-400 hover:text-white"
-                  title="Copy secret"
-                >
-                  {copiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowQrModal(false)}
-              className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white font-mono text-xs font-bold border border-zinc-600 uppercase"
-            >
-              [ CLOSE / ENTER 6-DIGIT CODE ]
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Footer */}
       <footer className="border-t-2 border-zinc-800 bg-black py-4 text-center text-[11px] text-zinc-500 font-mono">
