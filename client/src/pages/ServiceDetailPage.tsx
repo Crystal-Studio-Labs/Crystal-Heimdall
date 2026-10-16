@@ -240,8 +240,11 @@ export default function ServiceDetailPage() {
   const activeIncidents = incidents.filter((inc) => inc.status !== "resolved");
   const resolvedIncidents = incidents.filter((inc) => inc.status === "resolved");
 
-  const badgeUrl = `${window.location.origin}/api/v1/badges/service/${service.id}/status.svg`;
-  const markdownEmbed = `[![${service.name} Status](${badgeUrl})](${window.location.origin}/service/${service.id})`;
+  const canonicalOrigin = typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
+    ? window.location.origin
+    : "https://crystal-heimdall.vercel.app";
+  const badgeUrl = `${canonicalOrigin}/api/v1/badges/service/${service.id}/status.svg`;
+  const markdownEmbed = `[![${service.name} Status](${badgeUrl})](${canonicalOrigin}/service/${service.id})`;
 
   return (
     <div className="min-h-screen bg-[#070a0f] text-zinc-100 font-mono pb-24 relative overflow-hidden">
@@ -710,7 +713,18 @@ export default function ServiceDetailPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 py-1">
-            <img src={badgeUrl} alt={`${service.name} Status`} className="h-5" />
+            <img 
+              src={badgeUrl} 
+              alt={`${service.name} Status`} 
+              className="h-5 w-auto block max-w-full"
+              onError={(e) => {
+                const target = e.currentTarget as HTMLImageElement;
+                const fallbackUrl = `https://crystal-heimdall.vercel.app/api/v1/badges/service/${service.id}/status.svg`;
+                if (target.src !== fallbackUrl) {
+                  target.src = fallbackUrl;
+                }
+              }}
+            />
             <span className="text-[10px] text-zinc-500 font-mono">
               Dynamic SVG renders live operational state and links to this page.
             </span>

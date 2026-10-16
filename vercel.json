@@ -26,6 +26,14 @@
       "destination": "/api"
     },
     {
+      "source": "/badges/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/badges",
+      "destination": "/api"
+    },
+    {
       "source": "/sitemap.xml",
       "destination": "/sitemap.xml"
     },

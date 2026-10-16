@@ -1198,6 +1198,10 @@ export default function SettingsPage() {
               {/* Live Interactive Preview Card */}
               {(() => {
                 const origin = typeof window !== "undefined" ? window.location.origin : "https://crystal-heimdall.vercel.app";
+                const canonicalOrigin = typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
+                  ? window.location.origin
+                  : "https://crystal-heimdall.vercel.app";
+
                 const effectiveServiceId = selectedBadgeService || (allServices.length > 0 ? allServices[0].id : "");
                 const effectiveGroupName = selectedBadgeGroup || (groups.length > 0 ? groups[0].name : "Production");
 
@@ -1234,9 +1238,10 @@ export default function SettingsPage() {
 
                 const qs = params.toString();
                 const badgeSvgUrl = `${origin}${path}${qs ? `?${qs}` : ""}`;
+                const snippetBadgeSvgUrl = `${canonicalOrigin}${path}${qs ? `?${qs}` : ""}`;
 
-                const markdownSnippet = `[![${displayLabel}](${badgeSvgUrl})](${cleanRedirect})`;
-                const htmlSnippet = `<a href="${cleanRedirect}" target="_blank" rel="noopener noreferrer">\n  <img src="${badgeSvgUrl}" alt="${displayLabel}" />\n</a>`;
+                const markdownSnippet = `[![${displayLabel}](${snippetBadgeSvgUrl})](${cleanRedirect})`;
+                const htmlSnippet = `<a href="${cleanRedirect}" target="_blank" rel="noopener noreferrer">\n  <img src="${snippetBadgeSvgUrl}" alt="${displayLabel}" />\n</a>`;
 
                 return (
                   <div className="space-y-6">
@@ -1246,7 +1251,7 @@ export default function SettingsPage() {
                         // LIVE INTERACTIVE SHIELD PREVIEW //
                       </span>
                       
-                      <div className="p-4 bg-zinc-950 border border-zinc-800 flex items-center justify-center">
+                      <div className="p-4 bg-zinc-950 border border-zinc-800 flex items-center justify-center min-h-[48px]">
                         <a
                           href={cleanRedirect}
                           target="_blank"
@@ -1254,7 +1259,19 @@ export default function SettingsPage() {
                           className="inline-block hover:opacity-90 transition-transform active:scale-95"
                           title={`Click badge to test redirect to ${cleanRedirect}`}
                         >
-                          <img key={badgeSvgUrl} src={badgeSvgUrl} alt={displayLabel} className="h-6" />
+                          <img 
+                            key={badgeSvgUrl} 
+                            src={badgeSvgUrl} 
+                            alt={displayLabel} 
+                            className="h-6 w-auto block max-w-full"
+                            onError={(e) => {
+                              const target = e.currentTarget as HTMLImageElement;
+                              const fallbackUrl = `https://crystal-heimdall.vercel.app${path}${qs ? `?${qs}` : ""}`;
+                              if (target.src !== fallbackUrl) {
+                                target.src = fallbackUrl;
+                              }
+                            }}
+                          />
                         </a>
                       </div>
 

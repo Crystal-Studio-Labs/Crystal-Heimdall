@@ -33,9 +33,9 @@ function renderSvgBadge(
   const valueWidth = Math.max(40, Math.round(cleanValue.length * 7.2 + 16));
   const totalWidth = labelWidth + valueWidth;
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${totalWidth}" height="20" role="img" aria-label="${cleanLabel}: ${cleanValue}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${totalWidth} 20" width="${totalWidth}" height="20" role="img" aria-label="${cleanLabel}: ${cleanValue}">
   <title>${cleanLabel}: ${cleanValue} (Click to open Crystal Heimdall)</title>
-  <a xlink:href="${cleanLink}" href="${cleanLink}" target="_blank" rel="noopener noreferrer">
+  <a xlink:href="${cleanLink}" href="${cleanLink}" target="_blank">
     <g shape-rendering="crispEdges">
       <rect width="${labelWidth}" height="20" fill="#18181b"/>
       <rect x="${labelWidth}" width="${valueWidth}" height="20" fill="${color}"/>
@@ -202,7 +202,9 @@ router.get(["/project/:group/status.svg", "/project/:group.svg", "/project/:grou
   try {
     await initDb();
     res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
-    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.setHeader("Access-Control-Allow-Origin", "*");
     return await handleProjectGroupBadge(req.params.group, req, res);
   } catch (err: any) {
@@ -217,7 +219,9 @@ router.get(["/service/:id/status.svg", "/service/:id.svg", "/service/:id"], asyn
   try {
     await initDb();
     res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
-    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.setHeader("Access-Control-Allow-Origin", "*");
     return await handleServiceBadge(req.params.id, req, res);
   } catch (err: any) {
@@ -239,7 +243,9 @@ router.get(["/:id/status.svg", "/:id.svg", "/:id"], async (req: Request, res: Re
     const redirectUrl = (req.query.link as string) || DEFAULT_REDIRECT_URL;
 
     res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
-    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.setHeader("Access-Control-Allow-Origin", "*");
 
     // Fleet-wide aggregation badge
