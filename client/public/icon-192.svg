@@ -1,18 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <!-- Deep Dark Obsidian Canvas -->
   <rect width="192" height="192" fill="#070a0f"/>
-  <rect x="6" y="6" width="180" height="180" fill="none" stroke="#27272a" stroke-width="4"/>
-  <rect x="12" y="12" width="168" height="168" fill="none" stroke="#10b981" stroke-width="2"/>
   
-  <!-- Corner Brackets -->
-  <path d="M 12 28 L 12 12 L 28 12" stroke="#10b981" stroke-width="3" fill="none"/>
-  <path d="M 180 28 L 180 12 L 164 12" stroke="#10b981" stroke-width="3" fill="none"/>
-  <path d="M 12 164 L 12 180 L 28 180" stroke="#10b981" stroke-width="3" fill="none"/>
-  <path d="M 180 164 L 180 180 L 164 180" stroke="#10b981" stroke-width="3" fill="none"/>
+  <!-- Hard Drop Shadow (Brutalist shadow-[4px_4px_0px_#000]) -->
+  <rect x="30" y="30" width="144" height="144" fill="#000000"/>
+  
+  <!-- Badge Box (bg-zinc-900 border-2 border-emerald-400) -->
+  <rect x="18" y="18" width="144" height="144" fill="#18181b" stroke="#10b981" stroke-width="8"/>
+  
+  <!-- Corner Sentinel Accents -->
+  <path d="M 26 38 L 26 26 L 38 26" stroke="#34d399" stroke-width="3" fill="none"/>
+  <path d="M 154 38 L 154 26 L 142 26" stroke="#34d399" stroke-width="3" fill="none"/>
+  <path d="M 26 142 L 26 154 L 38 154" stroke="#34d399" stroke-width="3" fill="none"/>
+  <path d="M 154 142 L 154 154 L 142 154" stroke="#34d399" stroke-width="3" fill="none"/>
 
-  <!-- Industrial Activity Pulse & Bolt -->
-  <polygon points="106,24 56,98 96,98 86,160 136,86 96,86" fill="#10b981"/>
-  
-  <!-- Monospace Header & Footer Stamps -->
-  <text x="96" y="24" font-family="'JetBrains Mono', monospace, sans-serif" font-size="9" font-weight="900" fill="#71717a" text-anchor="middle" letter-spacing="2">CRYSTAL</text>
-  <text x="96" y="174" font-family="'JetBrains Mono', monospace, sans-serif" font-size="11" font-weight="900" fill="#38bdf8" text-anchor="middle" letter-spacing="3">HEIMDALL</text>
+  <!-- Lucide Activity Heartbeat Telemetry Pulse (emerald-400 #34d399) -->
+  <g transform="translate(42, 42) scale(4.0)">
+    <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" 
+          fill="none" 
+          stroke="#34d399" 
+          stroke-width="2.5" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"/>
+  </g>
 </svg>

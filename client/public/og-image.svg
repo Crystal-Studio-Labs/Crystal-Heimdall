@@ -35,12 +35,13 @@
     <text x="20" y="25" fill="#a1a1aa" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="800" letter-spacing="2">CRYSTAL STUDIO LABS</text>
   </g>
 
-  <!-- Main Hero Icon Box -->
+  <!-- Main Hero Icon Box (Matching Dashboard Badge) -->
   <g transform="translate(70, 160)">
-    <rect width="90" height="90" fill="#0b0f17" stroke="#10b981" stroke-width="3"/>
-    <rect x="8" y="8" width="74" height="74" fill="#000000"/>
-    <!-- Activity Pulse Polyline -->
-    <path d="M 16 45 L 32 45 L 42 22 L 52 68 L 62 45 L 74 45" stroke="#10b981" stroke-width="5" stroke-linecap="square" stroke-linejoin="miter" fill="none"/>
+    <rect x="6" y="6" width="90" height="90" fill="#000000"/>
+    <rect width="90" height="90" fill="#18181b" stroke="#10b981" stroke-width="3.5"/>
+    <g transform="translate(15, 15) scale(2.5)">
+      <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" stroke="#34d399" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </g>
   </g>
 
   <!-- Main Title -->

@@ -1,18 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Deep Dark Obsidian Canvas -->
   <rect width="512" height="512" fill="#070a0f"/>
-  <rect x="16" y="16" width="480" height="480" fill="none" stroke="#27272a" stroke-width="8"/>
-  <rect x="28" y="28" width="456" height="456" fill="none" stroke="#10b981" stroke-width="4"/>
   
-  <!-- Corner Brackets -->
-  <path d="M 28 64 L 28 28 L 64 28" stroke="#10b981" stroke-width="8" fill="none"/>
-  <path d="M 484 64 L 484 28 L 448 28" stroke="#10b981" stroke-width="8" fill="none"/>
-  <path d="M 28 448 L 28 484 L 64 484" stroke="#10b981" stroke-width="8" fill="none"/>
-  <path d="M 484 448 L 484 484 L 448 484" stroke="#10b981" stroke-width="8" fill="none"/>
+  <!-- Hard Drop Shadow (Brutalist shadow-[8px_8px_0px_#000]) -->
+  <rect x="80" y="80" width="384" height="384" fill="#000000"/>
+  
+  <!-- Badge Box (bg-zinc-900 border-2 border-emerald-400) -->
+  <rect x="48" y="48" width="384" height="384" fill="#18181b" stroke="#10b981" stroke-width="20"/>
+  
+  <!-- Corner Sentinel Accents -->
+  <path d="M 68 100 L 68 68 L 100 68" stroke="#34d399" stroke-width="8" fill="none"/>
+  <path d="M 412 100 L 412 68 L 380 68" stroke="#34d399" stroke-width="8" fill="none"/>
+  <path d="M 68 380 L 68 412 L 100 412" stroke="#34d399" stroke-width="8" fill="none"/>
+  <path d="M 412 380 L 412 412 L 380 412" stroke="#34d399" stroke-width="8" fill="none"/>
 
-  <!-- Industrial Activity Pulse & Bolt -->
-  <polygon points="284,68 152,260 256,260 228,424 360,232 256,232" fill="#10b981"/>
-  
-  <!-- Monospace Header & Footer Stamps -->
-  <text x="256" y="60" font-family="'JetBrains Mono', monospace, sans-serif" font-size="22" font-weight="900" fill="#71717a" text-anchor="middle" letter-spacing="6">CRYSTAL STUDIO LABS</text>
-  <text x="256" y="468" font-family="'JetBrains Mono', monospace, sans-serif" font-size="28" font-weight="900" fill="#38bdf8" text-anchor="middle" letter-spacing="8">CRYSTAL HEIMDALL</text>
+  <!-- Lucide Activity Heartbeat Telemetry Pulse (emerald-400 #34d399) -->
+  <g transform="translate(112, 112) scale(10.6667)">
+    <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" 
+          fill="none" 
+          stroke="#34d399" 
+          stroke-width="2.5" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"/>
+  </g>
 </svg>
