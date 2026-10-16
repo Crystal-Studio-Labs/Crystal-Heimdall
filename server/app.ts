@@ -36,6 +36,8 @@ import incidentsRoutes from "./routes/incidents.js";
 import analyticsRoutes from "./routes/analytics.js";
 import channelsRoutes from "./routes/channels.js";
 import telemetryRoutes from "./routes/telemetry.js";
+import badgesRoutes from "./routes/badges.js";
+import { getRssFeedHandler } from "./routes/status.js";
 
 // Root API Health Endpoint
 app.get(["/api", "/api/health"], (_req, res) => {
@@ -48,17 +50,21 @@ app.get(["/api", "/api/health"], (_req, res) => {
   });
 });
 
+// Mount Public RSS Feed
+app.get(["/status/feed.xml", "/feed.xml"], getRssFeedHandler);
+
 // Mount API Routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/services", servicesRoutes);
 app.use("/api/v1/status", statusRoutes);
+app.use("/api/v1/badges", badgesRoutes);
 app.use("/api/v1/alerts", alertsRoutes);
 app.use("/api/v1/incidents", incidentsRoutes);
 app.use("/api/v1/analytics", analyticsRoutes);
 app.use("/api/v1/channels", channelsRoutes);
 app.use("/api/v1/telemetry", telemetryRoutes);
 
-// Dead-Man's Switch ping check-in
+// Two-Way Sentinel Lifecycle Sync & Dead-Man's Switch ping check-in
 app.all("/api/v1/ping/:key", async (req, res) => {
   try {
     const { key } = req.params;
@@ -76,12 +82,56 @@ app.all("/api/v1/ping/:key", async (req, res) => {
     const service = svcRes.rows[0] as any;
     const now = Date.now();
 
-    await db.execute({
-      sql: "UPDATE services SET last_ping_at = ?, status = 'healthy', consecutive_failures = 0 WHERE id = ?",
-      args: [now, service.id],
+    // Parse event payload if provided via POST/PUT JSON
+    const body = (typeof req.body === "object" && req.body !== null) ? req.body : {};
+    const rawEvent = (body.event || req.query.event || "heartbeat").toString().toLowerCase();
+    const event: "online" | "heartbeat" | "offline" = 
+      rawEvent === "offline" ? "offline" : rawEvent === "online" ? "online" : "heartbeat";
+
+    const runtimeMeta = JSON.stringify({
+      event,
+      uptime: body.uptime !== undefined ? Number(body.uptime) : undefined,
+      memoryMB: body.memoryMB !== undefined ? Number(body.memoryMB) : undefined,
+      reason: body.reason ? String(body.reason) : undefined,
+      version: body.version ? String(body.version) : undefined,
+      timestamp: now,
+      ip: req.ip || req.headers["x-forwarded-for"] || "127.0.0.1",
     });
 
-    // Auto-resolve any active missed-heartbeat incident
+    if (event === "offline") {
+      // Graceful shutdown reported by application (SIGTERM/SIGINT)
+      await db.execute({
+        sql: `UPDATE services 
+              SET last_ping_at = ?, status = 'maintenance', is_maintenance = 1, last_event = 'offline', runtime_meta = ?
+              WHERE id = ?`,
+        args: [now, runtimeMeta, service.id],
+      });
+
+      return res.json({
+        status: "ok",
+        service: service.name,
+        acknowledged: "offline",
+        maintenance: true,
+        message: "Graceful shutdown acknowledged. Maintenance mode activated to suppress alarms.",
+        pingRecordedAt: new Date(now).toISOString(),
+      });
+    }
+
+    // "online" or "heartbeat" event
+    await db.execute({
+      sql: `UPDATE services 
+            SET last_ping_at = ?, status = 'healthy', is_maintenance = 0, consecutive_failures = 0, last_event = ?, runtime_meta = ?
+            WHERE id = ?`,
+      args: [now, event, runtimeMeta, service.id],
+    });
+
+    // Record telemetry point for sparklines
+    await db.execute({
+      sql: "INSERT INTO telemetry_points (service_id, latency_ms, status_code, recorded_at) VALUES (?, 0, 200, ?)",
+      args: [service.id, now],
+    });
+
+    // Auto-resolve any active incident for this service
     await db.execute({
       sql: "UPDATE incidents SET status = 'resolved', resolved_at = ? WHERE service_id = ? AND status = 'active'",
       args: [now, service.id],
@@ -90,6 +140,8 @@ app.all("/api/v1/ping/:key", async (req, res) => {
     return res.json({
       status: "ok",
       service: service.name,
+      acknowledged: event,
+      maintenance: false,
       type: service.type,
       pingRecordedAt: new Date(now).toISOString(),
     });

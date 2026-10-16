@@ -69,6 +69,18 @@ router.post("/", async (req: Request, res: Response) => {
       ],
     });
 
+    // Record initial timeline ledger entry
+    const initialUpdId = `upd-${Date.now().toString(36)}-init`;
+    await db.execute({
+      sql: "INSERT INTO incident_updates (id, incident_id, status, message, created_at) VALUES (?, ?, 'investigating', ?, ?)",
+      args: [
+        initialUpdId,
+        incId,
+        `Disruption detected: ${cleanTitle}. Automated probe threshold violation recorded.`,
+        now,
+      ],
+    });
+
     // Update service status
     const newStatus = severity === "critical" ? "critical" : "warning";
     await db.execute({
