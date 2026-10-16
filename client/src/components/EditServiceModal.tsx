@@ -121,33 +121,37 @@ export default function EditServiceModal({ isOpen, service, onClose, onUpdated }
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 font-mono text-xs overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 font-mono text-xs overflow-y-auto"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
+      role="dialog"
+      aria-modal="true"
     >
-      <div className="w-full max-w-xl bg-[#0b0f17] border-2 border-zinc-700 shadow-[6px_6px_0px_#000] p-6 space-y-6 my-8 animate-in fade-in zoom-in-95 duration-100">
+      <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[6px_6px_0px_#000] max-w-lg w-full max-h-[90vh] my-auto flex flex-col relative animate-in fade-in zoom-in-95 duration-100">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b-2 border-zinc-800">
+        <div className="p-4 sm:p-5 border-b-2 border-zinc-800 flex items-center justify-between shrink-0">
           <div>
-            <h2 className="text-base font-black text-white uppercase tracking-tight flex items-center gap-2">
+            <h2 className="text-sm sm:text-base font-black text-white uppercase tracking-tight flex items-center gap-2">
               <span className="w-2.5 h-2.5 bg-sky-400" />
               <span>EDIT TARGET CONFIGURATION</span>
             </h2>
-            <p className="text-[11px] text-zinc-400 font-sans mt-0.5">
+            <p className="text-[10px] text-zinc-400 font-sans mt-0.5 truncate max-w-[280px] sm:max-w-md">
               Modify operational parameters for {service.name} (ID: {service.id})
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-600 transition"
+            className="p-1.5 text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-600 transition shrink-0"
+            aria-label="Close modal"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Service Name */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
+            {/* Service Name */}
           <div className="space-y-1">
             <label className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider block">
               TARGET NAME *
@@ -424,20 +428,22 @@ export default function EditServiceModal({ isOpen, service, onClose, onUpdated }
             </button>
           </div>
 
+          </div>
+
           {/* Form Actions */}
-          <div className="pt-3 border-t-2 border-zinc-800 flex items-center justify-end space-x-3">
+          <div className="p-3 sm:p-4 border-t-2 border-zinc-800 bg-[#080c12] shrink-0 flex items-center justify-end space-x-2">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 font-bold transition shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+              className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 font-bold transition shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] min-h-[38px]"
             >
               CANCEL
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-black border-2 border-cyan-300 font-black flex items-center gap-1.5 transition shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+              className="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-black border-2 border-cyan-300 font-black flex items-center gap-1.5 transition shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] min-h-[38px]"
             >
               <Save className={`w-3.5 h-3.5 ${isSubmitting ? "animate-spin" : ""}`} />
               <span>{isSubmitting ? "SAVING..." : "SAVE CHANGES"}</span>
