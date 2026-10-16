@@ -82,7 +82,7 @@ interface AdvancedSettings {
 export default function SettingsPage() {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<
-    "status" | "groups" | "badges" | "alerts" | "inbound" | "security" | "advanced"
+    "status" | "groups" | "badges" | "advanced" | "alerts" | "security"
   >("status");
 
   // Status Page Configuration (Uptime Kuma Style)
@@ -380,8 +380,6 @@ export default function SettingsPage() {
   const [telegramTesting, setTelegramTesting] = useState(false);
   const [telegramStatus, setTelegramStatus] = useState<string | null>(null);
 
-  // Inbound Snippet Tab
-  const [activeSnippetTab, setActiveSnippetTab] = useState<"http" | "cron" | "curl">("http");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const handleCopy = (key: string, text: string) => {
@@ -496,35 +494,6 @@ export default function SettingsPage() {
     }
   };
 
-  const snippets = {
-    http: `// Inbound HTTP Exception Relay
-fetch("https://status.crystalstudio.labs/api/v1/sink/YOUR_API_KEY", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    title: "Unhandled Exception: Order Processor",
-    message: "Database query timed out during checkout transaction.",
-    severity: "critical",
-    stack: error.stack
-  })
-}).catch(console.error);`,
-    cron: `#!/usr/bin/env bash
-# Dead-Man's Switch Backup Runner
-set -e
-
-# Run your scheduled worker command
-./run-nightly-backup.sh
-
-# Ping Sentinel to signal nominal execution
-curl -fsS -m 10 --retry 3 https://status.crystalstudio.labs/api/v1/ping/YOUR_API_KEY > /dev/null`,
-    curl: `curl -X POST https://status.crystalstudio.labs/api/v1/sink/YOUR_API_KEY \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "title": "Manual Health Check",
-    "message": "Endpoint alive and responding nominally.",
-    "severity": "info"
-  }'`,
-  };
 
   return (
     <div className="min-h-screen bg-[#070a0f] text-zinc-100 flex flex-col font-mono relative overflow-hidden pb-24">
@@ -548,21 +517,20 @@ curl -fsS -m 10 --retry 3 https://status.crystalstudio.labs/api/v1/ping/YOUR_API
               Control Deck Settings
             </h1>
             <p className="text-xs text-zinc-400 font-sans">
-              Manage public status customization (Uptime Kuma style), notification conduits, and telemetry sinks.
+              Manage public status customization, project groups, embeddable shields, uptime engine, and notification relays.
             </p>
           </div>
         </div>
 
         {/* TOP TAB CONTROLS (INDUSTRIAL BRUTALIST ROCKER TABS) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           {[
             { id: "status", label: "[01] STATUS PAGE" },
             { id: "groups", label: "[02] GROUPS & ENVS" },
             { id: "badges", label: "[03] SVG BADGES" },
             { id: "advanced", label: "[04] UPTIME ENGINE" },
             { id: "alerts", label: "[05] DISPATCH" },
-            { id: "inbound", label: "[06] INBOUND SINKS" },
-            { id: "security", label: "[07] SECURITY" },
+            { id: "security", label: "[06] SECURITY" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -1217,6 +1185,41 @@ curl -fsS -m 10 --retry 3 https://status.crystalstudio.labs/api/v1/ping/YOUR_API
                   </div>
                 );
               })()}
+
+              {/* RSS Incident Feed Syndication */}
+              <div className="bg-black border border-zinc-800 p-4 sm:p-5 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-2.5">
+                  <div className="flex items-center space-x-2 text-xs font-bold text-amber-400 font-mono">
+                    <Rss className="w-4 h-4 text-amber-400" />
+                    <span>PUBLIC INCIDENT RSS 2.0 FEED SYNDICATION</span>
+                  </div>
+                  <a
+                    href="/api/v1/rss"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3 py-1 bg-zinc-900 border border-zinc-700 hover:border-amber-400 text-amber-300 text-[11px] font-bold uppercase flex items-center gap-1.5 self-start sm:self-auto transition font-mono"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    <span>OPEN FEED XML</span>
+                  </a>
+                </div>
+                <p className="text-xs text-zinc-400 font-sans leading-relaxed">
+                  External monitoring dashboards, Slack integrations, and reader clients can subscribe directly to this endpoint:
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={`${window.location.origin}/api/v1/rss`}
+                    className="w-full p-2 bg-zinc-950 border border-zinc-800 text-[11px] text-amber-300 font-mono outline-none"
+                  />
+                  <button
+                    onClick={() => handleCopy("rss-feed", `${window.location.origin}/api/v1/rss`)}
+                    className="px-3 py-2 bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white text-xs font-bold shrink-0 font-mono"
+                  >
+                    {copiedKey === "rss-feed" ? "COPIED" : "COPY"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1478,9 +1481,24 @@ curl -fsS -m 10 --retry 3 https://status.crystalstudio.labs/api/v1/ping/YOUR_API
           </div>
         )}
 
-        {/* TAB 3: EMERGENCY RELAYS (DISCORD, TELEGRAM & GENERIC WEBHOOK) */}
+        {/* TAB 5: EMERGENCY NOTIFICATION DISPATCH (DISCORD, TELEGRAM & GENERIC WEBHOOK) */}
         {activeTab === "alerts" && (
           <div className="space-y-6">
+            <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2 text-xs text-rose-400 font-bold">
+                  <Send className="w-4 h-4 text-rose-400" />
+                  <span>[OUTBOUND NOTIFICATION CONDUITS &amp; ALERTS]</span>
+                </div>
+                <h2 className="text-base sm:text-lg font-black text-white uppercase">
+                  Notification Dispatch Conduits
+                </h2>
+                <p className="text-xs text-zinc-400 font-sans">
+                  Configure direct webhooks and bot conduits to automatically dispatch instant incident alerts when services degrade or go down.
+                </p>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Discord */}
               <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 space-y-5 flex flex-col justify-between">
@@ -1651,177 +1669,10 @@ curl -fsS -m 10 --retry 3 https://status.crystalstudio.labs/api/v1/ping/YOUR_API
                 </div>
               </div>
             </div>
-
-            {/* Dynamic Badges & RSS Feed Hub */}
-            <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 sm:p-8 space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-zinc-800 pb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-9 h-9 bg-zinc-900 border-2 border-cyan-500 flex items-center justify-center text-cyan-400">
-                    <Rss className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-base font-black text-white uppercase">
-                      Dynamic SVG Badges & Public Incident RSS Feed
-                    </h2>
-                    <p className="text-xs text-zinc-400 font-sans">
-                      Embed live status shields into GitHub READMEs and subscribe via RSS readers.
-                    </p>
-                  </div>
-                </div>
-
-                <a
-                  href="/status/feed.xml"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:border-cyan-400 text-cyan-300 text-xs font-bold uppercase flex items-center gap-1.5 self-start sm:self-auto transition"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>[ OPEN RSS FEED XML ]</span>
-                </a>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* SVG Status Badge Preview & Markdown */}
-                <div className="space-y-3 p-4 bg-black border border-zinc-800">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white uppercase flex items-center gap-1.5">
-                      <Shield className="w-3.5 h-3.5 text-emerald-400" />
-                      Dynamic Status Shield
-                    </span>
-                    <span className="text-[10px] text-zinc-500 font-mono">Shields.io Compatible</span>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3 py-2">
-                    <img src="/api/v1/badges/fleet/status.svg" alt="Fleet Status Badge" className="h-5" />
-                    <img src="/api/v1/badges/fleet/status.svg?metric=uptime" alt="Fleet Uptime Badge" className="h-5" />
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-zinc-500 uppercase font-bold">README Embed Markdown:</span>
-                    <div className="flex items-center gap-2">
-                      <input
-                        readOnly
-                        value={`![Status](${window.location.origin}/api/v1/badges/fleet/status.svg)`}
-                        className="w-full p-2 bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-300 font-mono outline-none"
-                      />
-                      <button
-                        onClick={() => handleCopy("badge", `![Status](${window.location.origin}/api/v1/badges/fleet/status.svg)`)}
-                        className="px-3 py-2 bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white text-xs font-bold shrink-0"
-                      >
-                        {copiedKey === "badge" ? "COPIED" : "COPY"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* RSS Incident Feed */}
-                <div className="space-y-3 p-4 bg-black border border-zinc-800">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white uppercase flex items-center gap-1.5">
-                      <Rss className="w-3.5 h-3.5 text-cyan-400" />
-                      Incident RSS 2.0 Feed
-                    </span>
-                    <span className="text-[10px] text-zinc-500 font-mono">Live Syndicate</span>
-                  </div>
-
-                  <p className="text-xs text-zinc-400 font-sans leading-relaxed">
-                    External incident management systems, Slack RSS integrations, and reader clients can subscribe directly to this endpoint:
-                  </p>
-
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-zinc-500 uppercase font-bold">Public Feed URL:</span>
-                    <div className="flex items-center gap-2">
-                      <input
-                        readOnly
-                        value={`${window.location.origin}/status/feed.xml`}
-                        className="w-full p-2 bg-zinc-950 border border-zinc-800 text-[11px] text-cyan-300 font-mono outline-none"
-                      />
-                      <button
-                        onClick={() => handleCopy("rss", `${window.location.origin}/status/feed.xml`)}
-                        className="px-3 py-2 bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white text-xs font-bold shrink-0"
-                      >
-                        {copiedKey === "rss" ? "COPIED" : "COPY"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
-        {/* TAB 3: INBOUND SINKS */}
-        {activeTab === "inbound" && (
-          <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 sm:p-8 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-zinc-800 pb-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-9 h-9 bg-zinc-900 border-2 border-emerald-500 flex items-center justify-center text-emerald-400">
-                  <Code2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-base font-black text-white uppercase">
-                    Inbound Telemetry Sinks & Dead-Man Hooks
-                  </h2>
-                  <p className="text-xs text-zinc-400 font-sans">
-                    Integrate your workers, cron jobs, and error reporters into the Sentinel ledger.
-                  </p>
-                </div>
-              </div>
-
-              {/* Protocol Tabs */}
-              <div className="flex border border-zinc-700 bg-zinc-900 p-0.5 text-xs font-mono">
-                {[
-                  { id: "http", label: "HTTP EXCEPTION SINK" },
-                  { id: "cron", label: "CRON DEAD-MAN PING" },
-                  { id: "curl", label: "TERMINAL CURL" },
-                ].map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setActiveSnippetTab(t.id as any)}
-                    className={`px-3 py-1 uppercase text-[10px] font-bold transition ${
-                      activeSnippetTab === t.id
-                        ? "bg-zinc-700 text-white"
-                        : "text-zinc-400 hover:text-white"
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-zinc-400 flex items-center gap-2">
-                  <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-                  {activeSnippetTab === "http"
-                    ? "Inbound HTTP POST Crash Webhook"
-                    : activeSnippetTab === "cron"
-                    ? "Shell / Cron Heartbeat Dead-Man Switch"
-                    : "cURL Terminal Test"}
-                </span>
-
-                <button
-                  onClick={() => handleCopy(activeSnippetTab, snippets[activeSnippetTab])}
-                  className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-600 text-xs font-mono flex items-center gap-1.5"
-                >
-                  {copiedKey === activeSnippetTab ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5" />
-                  )}
-                  <span>{copiedKey === activeSnippetTab ? "Copied" : "Copy Snippet"}</span>
-                </button>
-              </div>
-
-              <pre className="p-4 bg-black border-2 border-zinc-800 text-emerald-300 font-mono text-xs overflow-x-auto leading-relaxed shadow-inner">
-                {snippets[activeSnippetTab]}
-              </pre>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 7: ACCESS & SECURITY */}
+        {/* TAB 6: ACCESS & SECURITY */}
         {activeTab === "security" && (
           <div className="bg-[#0b0f17] border-2 border-emerald-500/50 shadow-[4px_4px_0px_#000] p-6 sm:p-8 space-y-4">
             <div className="flex items-center space-x-3">
