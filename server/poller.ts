@@ -1,6 +1,7 @@
 import { getDb, initDb } from "./db.js";
 import { checkAndRegisterAlert } from "./deduplicator.js";
 import { sendTelegramAlert, sendDiscordWebhookAlert } from "./dispatcher.js";
+import { checkTcpPort, checkSslExpiry, parseTargetAddress } from "./probers.js";
 
 export interface PollResult {
   polledCount: number;
@@ -14,6 +15,122 @@ export interface PollResult {
     statusCode?: number;
     error?: string;
   }>;
+}
+
+/**
+ * Common handler to record telemetry, update target status, and trigger alert/incidents on failure.
+ */
+async function handleTargetEvaluation(
+  db: any,
+  svc: any,
+  isHealthy: boolean,
+  latencyMs: number,
+  statusCode: number,
+  errorMessage: string,
+  now: number,
+  result: PollResult
+) {
+  // Record telemetry point
+  await db.execute({
+    sql: "INSERT INTO telemetry_points (service_id, latency_ms, status_code, recorded_at) VALUES (?, ?, ?, ?)",
+    args: [svc.id, latencyMs, statusCode || null, now],
+  });
+
+  if (isHealthy) {
+    result.healthyCount++;
+    await db.execute({
+      sql: `UPDATE services 
+            SET status = 'healthy', latency_ms = ?, last_ping_at = ?, consecutive_failures = 0
+            WHERE id = ?`,
+      args: [latencyMs, now, svc.id],
+    });
+
+    // Auto-resolve any active incident for this service if recovered
+    await db.execute({
+      sql: `UPDATE incidents 
+            SET status = 'resolved', resolved_at = ? 
+            WHERE service_id = ? AND status = 'active'`,
+      args: [now, svc.id],
+    });
+
+    result.details.push({
+      serviceId: svc.id,
+      name: svc.name,
+      status: "healthy",
+      latencyMs,
+      statusCode,
+    });
+  } else {
+    result.failedCount++;
+    const retryThreshold = svc.retry_count || 2;
+    const nextFailures = (svc.consecutive_failures || 0) + 1;
+    const newStatus = nextFailures >= retryThreshold ? "critical" : "warning";
+
+    await db.execute({
+      sql: `UPDATE services 
+            SET status = ?, latency_ms = ?, last_ping_at = ?, consecutive_failures = ?
+            WHERE id = ?`,
+      args: [newStatus, latencyMs, now, nextFailures, svc.id],
+    });
+
+    if (nextFailures >= retryThreshold) {
+      const title = `Synthetic Poll Failure: ${errorMessage}`;
+      const dedupe = checkAndRegisterAlert(svc.id, title);
+
+      if (!dedupe.isSuppressed) {
+        const incId = `inc-${Date.now().toString(36)}`;
+        await db.execute({
+          sql: `INSERT INTO incidents (id, service_id, severity, title, message, fingerprint, status, occurrences_count, first_seen_at, last_seen_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'active', 1, ?, ?)`,
+          args: [
+            incId,
+            svc.id,
+            "critical",
+            title,
+            `Target ${svc.name} (${svc.endpoint || `port ${svc.port}`}) failed ${nextFailures} checks: ${errorMessage}`,
+            dedupe.fingerprint,
+            now,
+            now,
+          ],
+        });
+
+        await db.execute({
+          sql: "INSERT INTO incident_updates (id, incident_id, status, message, created_at) VALUES (?, ?, 'investigating', ?, ?)",
+          args: [
+            `upd-${Date.now().toString(36)}-init`,
+            incId,
+            `Synthetic check threshold breach: ${errorMessage}. Automated investigation initiated.`,
+            now,
+          ],
+        });
+
+        await sendTelegramAlert({
+          serviceName: svc.name,
+          severity: "critical",
+          title,
+          message: `Target ${svc.name} (${svc.endpoint || `port ${svc.port}`}) is unreachable (${errorMessage}).`,
+          timestamp: now,
+        });
+
+        await sendDiscordWebhookAlert({
+          serviceName: svc.name,
+          severity: "critical",
+          title,
+          message: `Target ${svc.name} (${svc.endpoint || `port ${svc.port}`}) is unreachable (${errorMessage}).`,
+          timestamp: now,
+        });
+      }
+    }
+
+    result.details.push({
+      serviceId: svc.id,
+      name: svc.name,
+      status: newStatus,
+      latencyMs,
+      statusCode,
+      error: errorMessage,
+    });
+  }
 }
 
 export async function runPollCycle(): Promise<PollResult> {
@@ -32,7 +149,7 @@ export async function runPollCycle(): Promise<PollResult> {
   };
 
   for (const svc of services) {
-    // If target is in maintenance mode, skip alerting
+    // 1. If target is in maintenance mode, skip alerting
     if (svc.is_maintenance === 1) {
       result.details.push({
         serviceId: svc.id,
@@ -43,7 +160,20 @@ export async function runPollCycle(): Promise<PollResult> {
       continue;
     }
 
-    if (svc.type === "http-poll" && svc.endpoint) {
+    // 2. TCP Socket Port Check (e.g. Postgres, Redis, Game/Custom Servers)
+    if (svc.type === "port-check" || (svc.endpoint && svc.endpoint.startsWith("tcp://"))) {
+      result.polledCount++;
+      const target = parseTargetAddress(svc.endpoint || "", svc.port);
+      const portRes = await checkTcpPort(target.host, target.port, 5000);
+      const isHealthy = portRes.isHealthy;
+      const latencyMs = portRes.latencyMs;
+      const statusCode = isHealthy ? 200 : 0;
+      const errorMessage = portRes.errorMessage || (isHealthy ? "" : "TCP connection failed");
+
+      await handleTargetEvaluation(db, svc, isHealthy, latencyMs, statusCode, errorMessage, now, result);
+    }
+    // 3. HTTP / HTTPS Synthetic Poll
+    else if (svc.type === "http-poll" && svc.endpoint) {
       result.polledCount++;
       const startTime = performance.now();
       let isHealthy = false;
@@ -86,104 +216,32 @@ export async function runPollCycle(): Promise<PollResult> {
         if (!isHealthy && !errorMessage) {
           errorMessage = `HTTP Status ${statusCode} ${res.statusText}`;
         }
+
+        // If HTTPS, check SSL certificate validity and expiry days
+        if (isHealthy && svc.endpoint.startsWith("https://")) {
+          try {
+            const parsed = parseTargetAddress(svc.endpoint);
+            const sslRes = await checkSslExpiry(parsed.host, parsed.port, 4000);
+            if (sslRes.daysRemaining !== null) {
+              await db.execute({
+                sql: "UPDATE services SET ssl_expiry_days = ? WHERE id = ?",
+                args: [sslRes.daysRemaining, svc.id],
+              });
+            }
+          } catch (_sslErr) {
+            // Non-fatal SSL inspection
+          }
+        }
       } catch (err: any) {
         latencyMs = Math.round(performance.now() - startTime);
         isHealthy = false;
         errorMessage = err.name === "AbortError" ? "Request Timeout (>7000ms)" : err.message;
       }
 
-      // Record telemetry point
-      await db.execute({
-        sql: "INSERT INTO telemetry_points (service_id, latency_ms, status_code, recorded_at) VALUES (?, ?, ?, ?)",
-        args: [svc.id, latencyMs, statusCode || null, now],
-      });
-
-      if (isHealthy) {
-        result.healthyCount++;
-        await db.execute({
-          sql: `UPDATE services 
-                SET status = 'healthy', latency_ms = ?, last_ping_at = ?, consecutive_failures = 0
-                WHERE id = ?`,
-          args: [latencyMs, now, svc.id],
-        });
-
-        // Auto-resolve any active incident for this service if recovered
-        await db.execute({
-          sql: `UPDATE incidents 
-                SET status = 'resolved', resolved_at = ? 
-                WHERE service_id = ? AND status = 'active'`,
-          args: [now, svc.id],
-        });
-
-        result.details.push({
-          serviceId: svc.id,
-          name: svc.name,
-          status: "healthy",
-          latencyMs,
-          statusCode,
-        });
-      } else {
-        result.failedCount++;
-        const retryThreshold = svc.retry_count || 2;
-        const nextFailures = (svc.consecutive_failures || 0) + 1;
-        const newStatus = nextFailures >= retryThreshold ? "critical" : "warning";
-
-        await db.execute({
-          sql: `UPDATE services 
-                SET status = ?, latency_ms = ?, last_ping_at = ?, consecutive_failures = ?
-                WHERE id = ?`,
-          args: [newStatus, latencyMs, now, nextFailures, svc.id],
-        });
-
-        if (nextFailures >= retryThreshold) {
-          const title = `Synthetic Poll Failure: ${errorMessage}`;
-          const dedupe = checkAndRegisterAlert(svc.id, title);
-
-          if (!dedupe.isSuppressed) {
-            const incId = `inc-${Date.now().toString(36)}`;
-            await db.execute({
-              sql: `INSERT INTO incidents (id, service_id, severity, title, message, fingerprint, status, occurrences_count, first_seen_at, last_seen_at)
-                    VALUES (?, ?, ?, ?, ?, ?, 'active', 1, ?, ?)`,
-              args: [
-                incId,
-                svc.id,
-                "critical",
-                title,
-                `Target ${svc.endpoint} failed ${nextFailures} checks: ${errorMessage}`,
-                dedupe.fingerprint,
-                now,
-                now,
-              ],
-            });
-
-            await sendTelegramAlert({
-              serviceName: svc.name,
-              severity: "critical",
-              title,
-              message: `Target ${svc.endpoint} is unreachable (${errorMessage}).`,
-              timestamp: now,
-            });
-
-            await sendDiscordWebhookAlert({
-              serviceName: svc.name,
-              severity: "critical",
-              title,
-              message: `Target ${svc.endpoint} is unreachable (${errorMessage}).`,
-              timestamp: now,
-            });
-          }
-        }
-
-        result.details.push({
-          serviceId: svc.id,
-          name: svc.name,
-          status: newStatus,
-          latencyMs,
-          statusCode,
-          error: errorMessage,
-        });
-      }
-    } else if (svc.type === "deadman-cron") {
+      await handleTargetEvaluation(db, svc, isHealthy, latencyMs, statusCode, errorMessage, now, result);
+    }
+    // 4. Dead-Man's Switch (Cron job heartbeats)
+    else if (svc.type === "deadman-cron") {
       const expectedSec = svc.expected_interval_sec || 86400;
       const graceSec = svc.grace_period_sec || 300;
       const deadlineMs = (svc.last_ping_at || svc.created_at) + (expectedSec + graceSec) * 1000;
@@ -209,6 +267,16 @@ export async function runPollCycle(): Promise<PollResult> {
               `Cron task ${svc.name} missed expected ping interval of ${expectedSec}s.`,
               dedupe.fingerprint,
               now,
+              now,
+            ],
+          });
+
+          await db.execute({
+            sql: "INSERT INTO incident_updates (id, incident_id, status, message, created_at) VALUES (?, ?, 'investigating', ?, ?)",
+            args: [
+              `upd-${Date.now().toString(36)}-init`,
+              incId,
+              `Dead-man missed heartbeat: expected ping interval of ${expectedSec}s expired.`,
               now,
             ],
           });

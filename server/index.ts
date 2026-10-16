@@ -16,6 +16,17 @@ async function bootstrap() {
     console.log(`🚀 Crystal-Heimdall running at http://localhost:${PORT}`);
   });
 
+  // Prime fresh telemetry 2 seconds after startup so targets are immediately probed
+  setTimeout(async () => {
+    try {
+      console.log("🔄 Triggering initial startup synthetic poll cycle...");
+      const res = await runPollCycle();
+      console.log(`✅ Startup poll complete: ${res.healthyCount}/${res.polledCount} targets healthy.`);
+    } catch (err) {
+      console.error("Startup poller error:", err);
+    }
+  }, 2000);
+
   // Start 60-second synthetic polling daemon (for standalone VPS/Docker runtimes)
   setInterval(async () => {
     try {
