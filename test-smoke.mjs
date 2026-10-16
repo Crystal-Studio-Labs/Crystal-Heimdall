@@ -685,7 +685,7 @@ async function runSmokeTests() {
   }
   console.log("   ✅ Single service SVG badge verified for [srv-auth] with dynamic state rendering.");
 
-  // 25d. Test Public Incident RSS Feed (/status/feed.xml & /api/v1/status/feed.xml)
+  // 25d. Test Public Incident RSS Feed (/status/feed.xml & /api/v1/rss)
   const rssRes = await fetch(`${BASE_URL}/status/feed.xml`);
   const rssXml = await rssRes.text();
   const rssType = rssRes.headers.get("content-type");
@@ -696,6 +696,13 @@ async function runSmokeTests() {
     throw new Error(`RSS feed XML malformed: ${rssXml.substring(0, 100)}`);
   }
   console.log("   ✅ Public Incident RSS 2.0 Feed (/status/feed.xml) verified with valid channel and items.");
+
+  const apiRssRes = await fetch(`${BASE_URL}/api/v1/rss`);
+  const apiRssXml = await apiRssRes.text();
+  if (!apiRssRes.ok || !apiRssXml.includes("<rss version=\"2.0\"")) {
+    throw new Error(`/api/v1/rss failed to return valid RSS feed (status: ${apiRssRes.status})`);
+  }
+  console.log("   ✅ Canonical RSS Feed (/api/v1/rss) verified with valid channel and items.");
 
   // 26. Two-Way Sentinel Sync Lifecycle (online, heartbeat, offline with metadata)
   console.log("\n26. TEST TWO-WAY SENTINEL SYNC LIFECYCLE (/api/v1/ping/:key)");

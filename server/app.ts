@@ -79,8 +79,16 @@ app.get(["/api", "/api/health"], (_req, res) => {
   });
 });
 
-// Mount Public RSS Feed
-app.get(["/status/feed.xml", "/feed.xml"], getRssFeedHandler);
+// Mount Public RSS Feed on all standard endpoints
+app.get([
+  "/api/v1/rss",
+  "/api/v1/feed.xml",
+  "/api/v1/status/feed.xml",
+  "/api/v1/status/rss",
+  "/status/feed.xml",
+  "/feed.xml",
+  "/rss"
+], getRssFeedHandler);
 
 // Mount API Routes
 app.use("/api/v1/auth", authRoutes);

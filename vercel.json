@@ -6,6 +6,18 @@
   "framework": null,
   "rewrites": [
     {
+      "source": "/status/feed.xml",
+      "destination": "/api"
+    },
+    {
+      "source": "/feed.xml",
+      "destination": "/api"
+    },
+    {
+      "source": "/rss",
+      "destination": "/api"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api"
     },
