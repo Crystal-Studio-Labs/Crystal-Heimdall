@@ -187,6 +187,23 @@ export async function initDb(): Promise<void> {
     }
   }
 
+  // High-performance indices for fast status lookups, badges & incident filtering
+  const indices = [
+    "CREATE INDEX IF NOT EXISTS idx_services_group ON services (group_name)",
+    "CREATE INDEX IF NOT EXISTS idx_services_status ON services (status)",
+    "CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents (status)",
+    "CREATE INDEX IF NOT EXISTS idx_incidents_svc ON incidents (service_id)",
+    "CREATE INDEX IF NOT EXISTS idx_project_groups_name ON project_groups (name)",
+  ];
+
+  for (const idxSql of indices) {
+    try {
+      await db.execute(idxSql);
+    } catch {
+      // Index already exists
+    }
+  }
+
   // Seed mock error issues for Sentry crash tracker if empty
   const errorCountRes = await db.execute("SELECT count(*) as count FROM error_issues");
   if (Number(errorCountRes.rows[0]?.count || 0) === 0) {
@@ -340,9 +357,9 @@ export async function initDb(): Promise<void> {
     });
   }
 
-  // Ensure page title is updated to Crystal Heimdall
+  // Ensure legacy page titles are migrated to Crystal Heimdall
   await db.execute({
-    sql: "UPDATE status_settings SET value = 'Crystal Heimdall' WHERE key = 'page_title'",
+    sql: "UPDATE status_settings SET value = 'Crystal Heimdall' WHERE key = 'page_title' AND (value = 'Sentinel Hub' OR value = 'Status Sentinel' OR value = '')",
     args: [],
   });
 

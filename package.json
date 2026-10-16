@@ -12,7 +12,9 @@
     "build": "npm run build:client && npm run build:server",
     "start": "node dist-server/index.js",
     "test": "node test-smoke.mjs",
-    "test:pentest": "node test-pentest.mjs"
+    "test:pentest": "node test-pentest.mjs",
+    "db:migrate": "node scripts/turso-migrate.mjs",
+    "db:turso": "node scripts/turso-migrate.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",

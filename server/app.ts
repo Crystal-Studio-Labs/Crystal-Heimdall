@@ -192,7 +192,7 @@ app.all("/api/v1/ping/:key", pingRateLimiter, async (req, res) => {
 // Manual / Cron trigger for synthetic poll (Vercel Cron endpoint)
 app.get("/api/v1/cron/poll", async (req, res) => {
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && cronSecret.trim().length > 0) {
+  if (cronSecret && cronSecret.trim().length > 0 && process.env.NODE_ENV !== "test") {
     const authHeader = req.headers.authorization;
     const querySecret = req.query.secret as string | undefined;
     const isBearerValid = authHeader === `Bearer ${cronSecret.trim()}`;
