@@ -39,10 +39,19 @@ router.get("/", async (_req: Request, res: Response) => {
       const isMaint = svc.is_maintenance === 1 || svc.status === "maintenance";
       const isHealthy = svc.status === "healthy";
       const isWarning = svc.status === "warning";
+      const svcCreated = Number(svc.created_at || 0);
 
       // Build 24 hourly blocks (0 = 24h ago, 23 = current hour)
       const hourlyBlocks = Array.from({ length: 24 }).map((_, b) => {
+        const bucketStart = past24h + b * 3600000;
+        const bucketEnd = bucketStart + 3600000;
         const bucketData = hourlyMap.get(`${svc.id}_${b}`);
+
+        // If this hour bucket ended before the service was registered and has no telemetry, mark as none (inactive)
+        if (svcCreated > 0 && bucketEnd <= svcCreated && (!bucketData || bucketData.total_checks === 0)) {
+          return { hour: b, status: "none" };
+        }
+
         if (isMaint) return { hour: b, status: "maintenance" };
 
         if (bucketData && bucketData.total_checks > 0) {

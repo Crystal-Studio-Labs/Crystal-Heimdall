@@ -90,6 +90,9 @@ router.get("/", statusRateLimiter, async (_req: Request, res: Response) => {
       const now = new Date();
       let totalChecksAll30d = 0;
       let failedChecksAll30d = 0;
+      const createdDateStr = svc.created_at
+        ? new Date(Number(svc.created_at)).toISOString().split("T")[0]
+        : null;
 
       for (let i = 29; i >= 0; i--) {
         const d = new Date(now);
@@ -97,10 +100,22 @@ router.get("/", statusRateLimiter, async (_req: Request, res: Response) => {
         const dateStr = d.toISOString().split("T")[0];
 
         const dayRecord = telemetryMap.get(`${svc.id}_${dateStr}`);
-        let blockStatus: "up" | "down" | "degraded" = "up";
-        let pct = 100.0;
+        let blockStatus: "up" | "down" | "degraded" | "none" | "maintenance" = "up";
+        let pct: number | null = 100.0;
 
-        if (dayRecord && dayRecord.total_checks > 0) {
+        // If this date is strictly before service registration and has no telemetry, mark as inactive pre-registration
+        if (createdDateStr && dateStr < createdDateStr && (!dayRecord || dayRecord.total_checks === 0)) {
+          blocks.push({
+            date: dateStr,
+            status: "none" as const,
+            uptimePct: null,
+          });
+          continue;
+        }
+
+        if (svc.is_maintenance === 1 || svc.status === "maintenance") {
+          blockStatus = "maintenance";
+        } else if (dayRecord && dayRecord.total_checks > 0) {
           totalChecksAll30d += dayRecord.total_checks;
           failedChecksAll30d += dayRecord.failed_checks;
 
@@ -121,10 +136,10 @@ router.get("/", statusRateLimiter, async (_req: Request, res: Response) => {
         if (i === 0) {
           if (svc.status === "critical") {
             blockStatus = "down";
-            pct = Math.min(pct, 68);
+            pct = Math.min(pct ?? 100, 68);
           } else if (svc.status === "warning") {
             blockStatus = "degraded";
-            pct = Math.min(pct, 94);
+            pct = Math.min(pct ?? 100, 94);
           }
         }
 

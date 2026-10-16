@@ -97,13 +97,17 @@ async function runSmokeTests() {
     if (!s.historyBlocks || s.historyBlocks.length !== 30) {
       throw new Error(`Public service ${s.name} missing 30-day historyBlocks ledger!`);
     }
-    const sampleBlock = s.historyBlocks[0];
-    if (!sampleBlock.date || typeof sampleBlock.uptimePct !== "number") {
+    const sampleOldBlock = s.historyBlocks[0];
+    const todayBlock = s.historyBlocks[29];
+    if (!sampleOldBlock.date || (sampleOldBlock.uptimePct !== null && typeof sampleOldBlock.uptimePct !== "number")) {
       throw new Error(`Service ${s.name} has malformed historyBlock!`);
+    }
+    if (!todayBlock.date || typeof todayBlock.uptimePct !== "number") {
+      throw new Error(`Service ${s.name} missing active status for today's block!`);
     }
   }
   console.log("   ✅ Public visibility filter strictly verified: 0 private services leaked.");
-  console.log(`   ✅ 30-Day authentic daily history blocks verified for all ${statusData.services.length} public services.`);
+  console.log(`   ✅ 30-Day authentic daily history blocks (pre-reg inactive + active today) verified for all ${statusData.services.length} public services.`);
 
   // 7. Test Visibility Toggle (PATCH /api/v1/services/:id)
   console.log("\n7. TEST VISIBILITY TOGGLE (PATCH /api/v1/services/:id)");

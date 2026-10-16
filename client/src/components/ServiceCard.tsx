@@ -150,6 +150,7 @@ export default function ServiceCard({ service, onRefresh, onEdit, onConnect }: S
   // 24 mini-bars for dashboard card (powered by authentic hourly telemetry)
   const miniBlocks = (service.hourlyBlocks && service.hourlyBlocks.length === 24)
     ? service.hourlyBlocks.map((b) => {
+        if (b.status === "none") return "bg-zinc-800/60";
         if (b.status === "maintenance") return "bg-sky-500";
         if (b.status === "down") return "bg-rose-500";
         if (b.status === "degraded") return "bg-amber-400";
@@ -159,7 +160,7 @@ export default function ServiceCard({ service, onRefresh, onEdit, onConnect }: S
         const isLatest = i === 23;
         if (isMaintenance) return "bg-sky-500";
         if (isLatest) return isHealthy ? "bg-emerald-400" : isWarning ? "bg-amber-400" : "bg-rose-500";
-        return "bg-emerald-500";
+        return "bg-zinc-800/60";
       });
 
   return (
