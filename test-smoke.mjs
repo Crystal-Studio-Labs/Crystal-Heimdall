@@ -885,7 +885,71 @@ async function runSmokeTests() {
   }
   console.log("   ✅ Single service SVG badge verified (/service/srv-auth/status.svg) with embedded redirect link.");
 
-  console.log("\n🎉 ALL 28 COMPREHENSIVE VERIFICATION TESTS PASSED NOMINAL! 🎉");
+  // 29. Test Single Service Deep Dive API, Latency Graph Telemetry & Display Toggles
+  console.log("\n29. TEST SINGLE SERVICE DETAILS API, LATENCY GRAPH TELEMETRY & DISPLAY TOGGLES");
+  const svcDetailsRes = await fetch(`${BASE_URL}/api/v1/services/srv-auth`);
+  const svcDetails = await svcDetailsRes.json();
+  if (!svcDetailsRes.ok || !svcDetails.service || svcDetails.service.name !== "Crystal Auth Gateway") {
+    throw new Error(`Single service details API failed: ${JSON.stringify(svcDetails)}`);
+  }
+  if (!Array.isArray(svcDetails.latencyHistory) || svcDetails.latencyHistory.length === 0) {
+    throw new Error("Single service details missing latencyHistory graph telemetry!");
+  }
+  if (!svcDetails.service.historyBlocks || svcDetails.service.historyBlocks.length !== 30) {
+    throw new Error("Single service details missing 30-day historyBlocks!");
+  }
+  console.log(`   ✅ Single service details API verified (/api/v1/services/srv-auth):`);
+  console.log(`      - Target: ${svcDetails.service.name} (${svcDetails.service.group_name})`);
+  console.log(`      - 24h SLA: ${svcDetails.service.stats.uptime_24h}% | 30d: ${svcDetails.service.stats.uptime_30d}%`);
+  console.log(`      - Latency Probes: ${svcDetails.latencyHistory.length} points (Avg: ${svcDetails.service.stats.avg_latency}ms, P95: ${svcDetails.service.stats.p95_latency}ms)`);
+  console.log(`      - History Blocks: ${svcDetails.service.historyBlocks.length} days`);
+
+  const statusSvcRes = await fetch(`${BASE_URL}/api/v1/status/service/srv-auth`);
+  if (!statusSvcRes.ok) {
+    throw new Error("Public status service endpoint (/api/v1/status/service/:id) failed!");
+  }
+  console.log("   ✅ Public status service alias verified (/api/v1/status/service/srv-auth).");
+
+  // Client SPA route for /service/:id
+  const svcSpaRes = await fetch(`${BASE_URL}/service/srv-auth`);
+  const svcSpaHtml = await svcSpaRes.text();
+  if (!svcSpaRes.ok || !svcSpaHtml.includes('<div id="root">')) {
+    throw new Error("Client SPA route /service/:id failed to serve HTML container!");
+  }
+  console.log("   ✅ Client SPA route /service/:id verified.");
+
+  // Test Display Toggles & Immediate Cache Busting
+  const toggleSaveRes = await fetch(`${BASE_URL}/api/v1/status/settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      show_sla: "false",
+      show_incidents: "false",
+    }),
+  });
+  if (!toggleSaveRes.ok) {
+    throw new Error("Failed to save display toggles via POST /api/v1/status/settings");
+  }
+
+  const statusVerifyRes = await fetch(`${BASE_URL}/api/v1/status`);
+  const statusVerify = await statusVerifyRes.json();
+  if (statusVerify.settings.show_sla !== "false" || statusVerify.settings.show_incidents !== "false") {
+    throw new Error("Cache busting failed: /api/v1/status did not immediately reflect updated show_sla and show_incidents settings!");
+  }
+  console.log("   ✅ Display 30-Day Fleet SLA and Display Incident History toggles & immediate cache-busting verified.");
+
+  // Restore defaults
+  await fetch(`${BASE_URL}/api/v1/status/settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      show_sla: "true",
+      show_incidents: "true",
+    }),
+  });
+  console.log("   ✅ Display toggles restored to nominal defaults (true).");
+
+  console.log("\n🎉 ALL 29 COMPREHENSIVE VERIFICATION TESTS PASSED NOMINAL! 🎉");
   } finally {
     if (serverInstance) {
       console.log("\n🧹 Closing temporary test server instance...");

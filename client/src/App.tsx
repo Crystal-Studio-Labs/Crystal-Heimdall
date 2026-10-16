@@ -9,6 +9,7 @@ import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import SettingsPage from "./pages/SettingsPage";
+import ServiceDetailPage from "./pages/ServiceDetailPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import { getAuthToken } from "./lib/api";
 import { ToastProvider } from "./lib/ToastContext";
@@ -31,6 +32,10 @@ export default function App() {
           <Route path="/status" element={<Navigate to="/" replace />} />
           <Route path="/overview" element={<LandingPage />} />
           <Route path="/about" element={<Navigate to="/overview" replace />} />
+
+          {/* Public Service & Telemetry Diagnostics Route */}
+          <Route path="/service/:id" element={<ServiceDetailPage />} />
+          <Route path="/status/service/:id" element={<ServiceDetailPage />} />
 
           {/* Public Incidents Ledger & Detail Routes */}
           <Route path="/incidents" element={<IncidentsPage />} />

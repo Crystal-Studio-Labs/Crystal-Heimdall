@@ -159,7 +159,8 @@ export default function StatusPage() {
   const isDegraded = data.overallStatus === "degraded";
 
   const settings = data.settings || {};
-  const showIncidents = settings.show_incidents === true || settings.show_incidents === "true" || settings.show_incidents === undefined;
+  const showSla = settings.show_sla === true || settings.show_sla === "true" || (settings.show_sla === undefined ? true : false);
+  const showIncidents = settings.show_incidents === true || settings.show_incidents === "true" || (settings.show_incidents === undefined ? true : false);
   const announcementType = settings.announcement_type || "none";
   const announcementBanner = settings.announcement_banner || "";
 
@@ -297,54 +298,56 @@ export default function StatusPage() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-3 self-end sm:self-auto text-xs shrink-0">
-            <div className="px-3 py-1 bg-black border border-zinc-700 flex items-center space-x-2">
-              <span className="w-2 h-2 bg-emerald-400 inline-block animate-pulse" />
-              <span className="text-white font-black">{data.avgUptime}% UPTIME</span>
+          {showSla && (
+            <div className="flex items-center space-x-3 self-end sm:self-auto text-xs shrink-0">
+              <div className="px-3 py-1 bg-black border border-zinc-700 flex items-center space-x-2">
+                <span className="w-2 h-2 bg-emerald-400 inline-block animate-pulse" />
+                <span className="text-white font-black">{data.avgUptime}% UPTIME</span>
+              </div>
+              <span className="text-[10px] text-zinc-400 uppercase hidden md:inline">
+                30-DAY WINDOW
+              </span>
             </div>
-            <span className="text-[10px] text-zinc-400 uppercase hidden md:inline">
-              30-DAY WINDOW
-            </span>
-          </div>
+          )}
         </div>
 
         {/* INCIDENTS SECTION (DIRECTLY UNDER STATUS AREA) */}
-        <div className="space-y-4">
-          {/* Active Incidents Alert Callout (Only when present) */}
-          {activeIncidents.length > 0 && (
-            <div className="p-4 bg-rose-950/70 border-2 border-rose-600 shadow-[3px_3px_0px_#000] space-y-3">
-              <div className="flex items-center space-x-2 text-rose-400 font-black text-xs uppercase tracking-wide">
-                <AlertCircle className="w-4 h-4 animate-pulse shrink-0" />
-                <span>ACTIVE INCIDENT IN PROGRESS ({activeIncidents.length})</span>
-              </div>
-              {activeIncidents.map((inc) => (
-                <div key={inc.id} className="p-3 bg-black/80 border border-rose-800/80 space-y-1.5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white uppercase">{inc.title}</span>
-                    <span className="text-[10px] text-zinc-400 font-mono">
-                      {new Date(inc.last_seen_at).toLocaleTimeString()}
-                    </span>
-                  </div>
-                  {inc.message && (
-                    <p className="text-zinc-300 text-xs font-sans leading-relaxed">
-                      {inc.message}
-                    </p>
-                  )}
-                  <div className="pt-1">
-                    <Link 
-                      to={`/incidents/${inc.id}`}
-                      className="text-[10px] text-cyan-400 hover:text-cyan-300 uppercase font-bold flex items-center gap-1"
-                    >
-                      <span>View Timeline &amp; Diagnostics &rarr;</span>
-                    </Link>
-                  </div>
+        {showIncidents && (
+          <div className="space-y-4">
+            {/* Active Incidents Alert Callout (Only when present) */}
+            {activeIncidents.length > 0 && (
+              <div className="p-4 bg-rose-950/70 border-2 border-rose-600 shadow-[3px_3px_0px_#000] space-y-3">
+                <div className="flex items-center space-x-2 text-rose-400 font-black text-xs uppercase tracking-wide">
+                  <AlertCircle className="w-4 h-4 animate-pulse shrink-0" />
+                  <span>ACTIVE INCIDENT IN PROGRESS ({activeIncidents.length})</span>
                 </div>
-              ))}
-            </div>
-          )}
+                {activeIncidents.map((inc) => (
+                  <div key={inc.id} className="p-3 bg-black/80 border border-rose-800/80 space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white uppercase">{inc.title}</span>
+                      <span className="text-[10px] text-zinc-400 font-mono">
+                        {new Date(inc.last_seen_at).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    {inc.message && (
+                      <p className="text-zinc-300 text-xs font-sans leading-relaxed">
+                        {inc.message}
+                      </p>
+                    )}
+                    <div className="pt-1">
+                      <Link 
+                        to={`/incidents/${inc.id}`}
+                        className="text-[10px] text-cyan-400 hover:text-cyan-300 uppercase font-bold flex items-center gap-1"
+                      >
+                        <span>View Timeline &amp; Diagnostics &rarr;</span>
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
-          {/* Past 30-Day Incident History (Directly Under Status Area) */}
-          {showIncidents && (
+            {/* Past 30-Day Incident History (Directly Under Status Area) */}
             <div className="space-y-2">
               <div className="flex items-center justify-between px-1">
                 <span className="text-xs font-black text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -405,8 +408,8 @@ export default function StatusPage() {
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* BROADCAST ANNOUNCEMENT BANNER (IF ACTIVE) */}
         {announcementType !== "none" && announcementBanner && (
@@ -478,9 +481,11 @@ export default function StatusPage() {
                     const isMaint = svc.status === "maintenance" || svc.is_maintenance === 1;
 
                     return (
-                      <div 
+                      <Link 
                         key={svc.id} 
-                        className="p-3.5 sm:p-4 hover:bg-zinc-900/40 transition space-y-2.5 sm:space-y-2"
+                        to={`/service/${svc.id}`}
+                        className="block p-3.5 sm:p-4 hover:bg-zinc-900/60 hover:border-l-2 hover:border-l-cyan-400 transition space-y-2.5 sm:space-y-2 group cursor-pointer"
+                        title={`Click to view ${svc.name} diagnostics, response time graph & incidents`}
                       >
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           {/* Monitor Name & Protocol */}
@@ -494,8 +499,11 @@ export default function StatusPage() {
                                 ? "bg-amber-400" 
                                 : "bg-rose-500 animate-pulse"
                             }`} />
-                            <h3 className="font-bold text-white text-xs sm:text-sm uppercase tracking-tight truncate">
-                              {svc.name}
+                            <h3 className="font-bold text-white text-xs sm:text-sm uppercase tracking-tight truncate group-hover:text-cyan-300 transition flex items-center gap-1.5">
+                              <span>{svc.name}</span>
+                              <span className="text-[10px] text-cyan-400/70 opacity-0 group-hover:opacity-100 transition-opacity font-mono">
+                                [DETAILS &rarr;]
+                              </span>
                             </h3>
                             <span className="px-1.5 py-0.5 text-[9px] bg-zinc-900 border border-zinc-700 text-zinc-400 uppercase font-mono shrink-0">
                               {svc.type}
@@ -526,7 +534,7 @@ export default function StatusPage() {
 
                         {/* Compact 30-Day Segmented Strip */}
                         <HeartbeatBars blocks={svc.historyBlocks} compact={true} />
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>

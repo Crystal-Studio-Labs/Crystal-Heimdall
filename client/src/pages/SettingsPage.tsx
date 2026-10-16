@@ -265,8 +265,8 @@ export default function SettingsPage() {
             page_description: s.page_description || "Continuous Multi-Point Health Monitoring & Real-Time Incident Status",
             announcement_banner: s.announcement_banner || "",
             announcement_type: (s.announcement_type as any) || "info",
-            show_sla: s.show_sla === "true" || s.show_sla === true,
-            show_incidents: s.show_incidents === "true" || s.show_incidents === true,
+            show_sla: s.show_sla === undefined ? true : (s.show_sla === "true" || s.show_sla === true),
+            show_incidents: s.show_incidents === undefined ? true : (s.show_incidents === "true" || s.show_incidents === true),
             footer_text: s.footer_text || "Crystal Studio Labs • Autonomous Reliability Sentinel",
             support_url: s.support_url || "https://github.com/Crystal-Studio-Labs",
           });
@@ -685,31 +685,53 @@ export default function SettingsPage() {
 
               {/* TOGGLES & DISPLAY CONTROLS */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                <label className="p-4 bg-zinc-950 border-2 border-zinc-800 flex items-center justify-between cursor-pointer hover:border-zinc-700">
-                  <div className="space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => setStatusSettings({ ...statusSettings, show_sla: !statusSettings.show_sla })}
+                  className={`p-4 border-2 flex items-center justify-between text-left transition shadow-[2px_2px_0px_#000] cursor-pointer ${
+                    statusSettings.show_sla
+                      ? "bg-emerald-950/20 border-emerald-500 text-emerald-300"
+                      : "bg-zinc-950 border-zinc-800 hover:border-zinc-700 text-zinc-400"
+                  }`}
+                >
+                  <div className="space-y-0.5 min-w-0">
                     <span className="text-xs font-bold text-white block uppercase">Display 30-Day Fleet SLA</span>
-                    <span className="text-[11px] text-zinc-500 font-sans block">Show calculated uptime percentage on public page</span>
+                    <span className="text-[11px] text-zinc-400 font-sans block">Show calculated uptime percentage on public page</span>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={statusSettings.show_sla}
-                    onChange={(e) => setStatusSettings({ ...statusSettings, show_sla: e.target.checked })}
-                    className="w-4 h-4 accent-emerald-400 cursor-pointer"
-                  />
-                </label>
+                  <div className="flex items-center gap-2 shrink-0 ml-3">
+                    <span className={`text-[10px] font-mono font-bold px-2 py-1 border uppercase tracking-wider ${
+                      statusSettings.show_sla
+                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]"
+                        : "bg-zinc-900 text-zinc-500 border-zinc-700"
+                    }`}>
+                      {statusSettings.show_sla ? "[ ENABLED ]" : "[ DISABLED ]"}
+                    </span>
+                  </div>
+                </button>
 
-                <label className="p-4 bg-zinc-950 border-2 border-zinc-800 flex items-center justify-between cursor-pointer hover:border-zinc-700">
-                  <div className="space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => setStatusSettings({ ...statusSettings, show_incidents: !statusSettings.show_incidents })}
+                  className={`p-4 border-2 flex items-center justify-between text-left transition shadow-[2px_2px_0px_#000] cursor-pointer ${
+                    statusSettings.show_incidents
+                      ? "bg-emerald-950/20 border-emerald-500 text-emerald-300"
+                      : "bg-zinc-950 border-zinc-800 hover:border-zinc-700 text-zinc-400"
+                  }`}
+                >
+                  <div className="space-y-0.5 min-w-0">
                     <span className="text-xs font-bold text-white block uppercase">Display Incident History</span>
-                    <span className="text-[11px] text-zinc-500 font-sans block">Show recent incidents and outage ledger</span>
+                    <span className="text-[11px] text-zinc-400 font-sans block">Show recent incidents and outage ledger</span>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={statusSettings.show_incidents}
-                    onChange={(e) => setStatusSettings({ ...statusSettings, show_incidents: e.target.checked })}
-                    className="w-4 h-4 accent-emerald-400 cursor-pointer"
-                  />
-                </label>
+                  <div className="flex items-center gap-2 shrink-0 ml-3">
+                    <span className={`text-[10px] font-mono font-bold px-2 py-1 border uppercase tracking-wider ${
+                      statusSettings.show_incidents
+                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]"
+                        : "bg-zinc-900 text-zinc-500 border-zinc-700"
+                    }`}>
+                      {statusSettings.show_incidents ? "[ ENABLED ]" : "[ DISABLED ]"}
+                    </span>
+                  </div>
+                </button>
               </div>
 
               {/* FOOTER & SUPPORT URL */}

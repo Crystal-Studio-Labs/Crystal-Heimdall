@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { getDb, initDb } from "../db.js";
 import { createRateLimiter } from "../rateLimiter.js";
+import { getServiceDetails } from "./services.js";
 
 const router = Router();
 
@@ -282,9 +283,37 @@ router.post("/settings", async (req: Request, res: Response) => {
       }
     }
 
+    // Immediately bust status cache so public status reflects updated settings
+    invalidateStatusCache();
+
     return res.json({ success: true, settings });
   } catch (err: any) {
     return res.status(500).json({ error: "Failed to update status settings", details: err.message });
+  }
+});
+
+// GET single service details (for public status deep dive)
+router.get("/service/:id", async (req: Request, res: Response) => {
+  try {
+    const details = await getServiceDetails(req.params.id);
+    if (!details) {
+      return res.status(404).json({ error: "Service not found." });
+    }
+    return res.json(details);
+  } catch (err: any) {
+    return res.status(500).json({ error: "Failed to fetch service details", details: err.message });
+  }
+});
+
+router.get("/services/:id", async (req: Request, res: Response) => {
+  try {
+    const details = await getServiceDetails(req.params.id);
+    if (!details) {
+      return res.status(404).json({ error: "Service not found." });
+    }
+    return res.json(details);
+  } catch (err: any) {
+    return res.status(500).json({ error: "Failed to fetch service details", details: err.message });
   }
 });
 
