@@ -77,25 +77,53 @@ router.get("/", async (req: Request, res: Response) => {
       mttrMinutes = Math.round(totalMs / resolvedRes.rows.length / 60000) || 1;
     }
 
-    // 6. Uptime Kuma per-monitor breakdown table
-    const allPtsRes = await db.execute({
-      sql: "SELECT service_id, latency_ms, status_code FROM telemetry_points WHERE recorded_at >= ?",
-      args: [past24h],
+    // 6. Uptime Kuma per-monitor breakdown table with genuine 24h, 7d, and 30d SLAs
+    const past7d = now - 7 * 86400 * 1000;
+    const past30d = now - 30 * 86400 * 1000;
+
+    const slaRes = await db.execute({
+      sql: `SELECT 
+              service_id, 
+              COUNT(*) as total_30d, 
+              SUM(CASE WHEN (status_code IS NOT NULL AND status_code >= 400) OR status_code = 0 THEN 1 ELSE 0 END) as failed_30d, 
+              SUM(CASE WHEN recorded_at >= ? THEN 1 ELSE 0 END) as total_7d, 
+              SUM(CASE WHEN recorded_at >= ? AND ((status_code IS NOT NULL AND status_code >= 400) OR status_code = 0) THEN 1 ELSE 0 END) as failed_7d, 
+              SUM(CASE WHEN recorded_at >= ? THEN 1 ELSE 0 END) as total_24h, 
+              SUM(CASE WHEN recorded_at >= ? AND ((status_code IS NOT NULL AND status_code >= 400) OR status_code = 0) THEN 1 ELSE 0 END) as failed_24h, 
+              ROUND(AVG(CASE WHEN recorded_at >= ? THEN latency_ms ELSE NULL END), 1) as avg_latency_24h 
+            FROM telemetry_points 
+            WHERE recorded_at >= ? 
+            GROUP BY service_id`,
+      args: [past7d, past7d, past24h, past24h, past24h, past30d],
     });
-    const allPts = allPtsRes.rows as any[];
+
+    const slaMap = new Map<string, any>();
+    for (const row of slaRes.rows as any[]) {
+      slaMap.set(String(row.service_id), row);
+    }
 
     const monitorsBreakdown = allServices.map((svc) => {
-      const svcPoints = allPts.filter((p) => p.service_id === svc.id);
-      const totalChecks = svcPoints.length;
-      const failedChecks = svcPoints.filter((p) => p.status_code && p.status_code >= 400).length;
+      const stats = slaMap.get(svc.id);
+      const total24h = Number(stats?.total_24h || 0);
+      const failed24h = Number(stats?.failed_24h || 0);
+      const total7d = Number(stats?.total_7d || 0);
+      const failed7d = Number(stats?.failed_7d || 0);
+      const total30d = Number(stats?.total_30d || 0);
+      const failed30d = Number(stats?.failed_30d || 0);
 
-      const uptime24h = totalChecks > 0
-        ? Number(((1 - failedChecks / totalChecks) * 100).toFixed(2))
+      const uptime24h = total24h > 0
+        ? Number(((1 - failed24h / total24h) * 100).toFixed(2))
         : Number(svc.uptime_pct || 100.0);
 
-      const avgLat = totalChecks > 0
-        ? Math.round(svcPoints.reduce((acc, p) => acc + (p.latency_ms || 0), 0) / totalChecks)
-        : Number(svc.latency_ms || 0);
+      const uptime7d = total7d > 0
+        ? Number(((1 - failed7d / total7d) * 100).toFixed(2))
+        : Number(svc.uptime_pct || 100.0);
+
+      const uptime30d = total30d > 0
+        ? Number(((1 - failed30d / total30d) * 100).toFixed(2))
+        : Number(svc.uptime_pct || 100.0);
+
+      const avgLat = Number(stats?.avg_latency_24h || svc.latency_ms || 0);
 
       return {
         id: svc.id,
@@ -105,11 +133,11 @@ router.get("/", async (req: Request, res: Response) => {
         status: svc.status,
         is_maintenance: svc.is_maintenance,
         uptime24h,
-        uptime7d: Math.max(99.0, Number((uptime24h - 0.05).toFixed(2))),
-        uptime30d: Number(svc.uptime_pct || 99.8),
+        uptime7d,
+        uptime30d,
         currentLatency: svc.latency_ms || 0,
-        avgLatency: avgLat,
-        checksCount24h: totalChecks,
+        avgLatency: Math.round(avgLat),
+        checksCount24h: total24h,
       };
     });
 

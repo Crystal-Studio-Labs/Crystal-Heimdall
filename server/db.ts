@@ -78,6 +78,20 @@ export async function initDb(): Promise<void> {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS incident_updates (
+      id TEXT PRIMARY KEY,
+      incident_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      message TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+  `);
+
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_incident_updates_inc_time ON incident_updates (incident_id, created_at ASC);
+  `);
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS telemetry_points (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       service_id TEXT NOT NULL,
@@ -85,6 +99,14 @@ export async function initDb(): Promise<void> {
       status_code INTEGER,
       recorded_at INTEGER NOT NULL
     );
+  `);
+
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_telemetry_points_svc_rec ON telemetry_points (service_id, recorded_at);
+  `);
+
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_telemetry_points_rec ON telemetry_points (recorded_at);
   `);
 
   await db.execute(`
@@ -130,6 +152,9 @@ export async function initDb(): Promise<void> {
     "ALTER TABLE services ADD COLUMN retry_count INTEGER DEFAULT 2",
     "ALTER TABLE services ADD COLUMN ssl_expiry_days INTEGER",
     "ALTER TABLE services ADD COLUMN is_maintenance INTEGER DEFAULT 0",
+    "ALTER TABLE services ADD COLUMN group_name TEXT DEFAULT 'Production'",
+    "ALTER TABLE services ADD COLUMN last_event TEXT DEFAULT 'online'",
+    "ALTER TABLE services ADD COLUMN runtime_meta TEXT",
   ];
 
   for (const alterSql of alterColumns) {
@@ -299,5 +324,28 @@ export async function initDb(): Promise<void> {
     args: [],
   });
 
+  // Backfill initial investigating updates for any incidents missing timeline records
+  try {
+    const unlinkedIncidents = await db.execute(`
+      SELECT i.id, i.title, i.first_seen_at 
+      FROM incidents i 
+      WHERE i.id NOT IN (SELECT DISTINCT incident_id FROM incident_updates)
+    `);
+    for (const row of unlinkedIncidents.rows as any[]) {
+      await db.execute({
+        sql: "INSERT INTO incident_updates (id, incident_id, status, message, created_at) VALUES (?, ?, 'investigating', ?, ?)",
+        args: [
+          `upd-${Math.random().toString(36).substring(2, 9)}`,
+          row.id,
+          `Initial anomaly recorded: ${row.title || "Disruption logged to sentinel ledger."}`,
+          row.first_seen_at || Date.now(),
+        ],
+      });
+    }
+  } catch {
+    // Ignore migration error if table empty
+  }
+
   isInitialized = true;
 }
+
