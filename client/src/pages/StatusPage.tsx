@@ -74,17 +74,14 @@ export default function StatusPage() {
   } | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [nextSyncSeconds, setNextSyncSeconds] = useState(30);
   const [searchQuery, setSearchQuery] = useState("");
   const prevStatusRef = useRef<string | null>(null);
 
-  const fetchStatus = async (isManual = false): Promise<boolean> => {
+  const fetchStatus = async (): Promise<boolean> => {
     try {
       const res = await fetch("/api/v1/status");
       if (res.status === 429) {
-        toast.info("Status cache is up to date (rate limit protected). Auto-sync active.");
         return false;
       }
       if (res.ok) {
@@ -105,7 +102,6 @@ export default function StatusPage() {
       return false;
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false);
     }
   };
 
@@ -114,10 +110,9 @@ export default function StatusPage() {
     fetchStatus();
   }, []);
 
-  // 1-second cadence timer for auto-sync countdown & cooldown tick
+  // 1-second cadence timer for background auto-sync countdown (every 30s)
   useEffect(() => {
     const timer = setInterval(() => {
-      setCooldownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
       setNextSyncSeconds((prev) => {
         if (prev <= 1) {
           fetchStatus();
@@ -129,18 +124,6 @@ export default function StatusPage() {
 
     return () => clearInterval(timer);
   }, []);
-
-  const handleManualRefresh = () => {
-    if (cooldownSeconds > 0 || isRefreshing) return;
-    setIsRefreshing(true);
-    setCooldownSeconds(15);
-    setNextSyncSeconds(30);
-    fetchStatus(true).then((ok) => {
-      if (ok) {
-        toast.info("Status ledger refreshed with latest telemetry");
-      }
-    });
-  };
 
   const handleShareStatus = () => {
     navigator.clipboard.writeText(window.location.origin);
@@ -244,29 +227,12 @@ export default function StatusPage() {
 
             {/* Live Auto-Sync Ticker */}
             <div 
-              className="hidden sm:flex items-center space-x-1.5 px-2 py-1 bg-black border border-zinc-800 text-[10px] text-zinc-400 font-mono"
-              title="Continuous background telemetry refresh interval"
+              className="flex items-center space-x-1.5 px-2 py-1 bg-black border border-zinc-800 text-[10px] text-zinc-400 font-mono"
+              title="Continuous background telemetry auto-sync cadence"
             >
               <span className="w-1.5 h-1.5 bg-emerald-400 inline-block animate-pulse" />
               <span>AUTO-SYNC ({nextSyncSeconds}s)</span>
             </div>
-
-            {/* Manual Refresh with Cooldown */}
-            <button
-              onClick={handleManualRefresh}
-              disabled={isRefreshing || cooldownSeconds > 0}
-              className={`p-1.5 sm:px-2.5 sm:py-1 border transition flex items-center gap-1.5 text-xs font-mono shadow-[1px_1px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] ${
-                cooldownSeconds > 0
-                  ? "bg-zinc-950 border-zinc-800 text-zinc-500 cursor-not-allowed"
-                  : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700"
-              }`}
-              title={cooldownSeconds > 0 ? `Refresh cooling down (${cooldownSeconds}s) to prevent rate limits` : "Refresh status telemetry"}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-emerald-400" : ""}`} />
-              <span className="hidden sm:inline">
-                {cooldownSeconds > 0 ? `SYNC (${cooldownSeconds}s)` : "REFRESH"}
-              </span>
-            </button>
 
             {/* Operator Session Pill */}
             {isAuthenticated ? (
