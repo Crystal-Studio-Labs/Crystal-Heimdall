@@ -56,6 +56,22 @@ export default function ConnectProjectModal({ isOpen, onClose, onCreated, initia
   const [copiedKey, setCopiedKey] = useState(false);
   const [handshakeStatus, setHandshakeStatus] = useState<"waiting" | "connected">("waiting");
   const [liveMeta, setLiveMeta] = useState<any>(null);
+  const [availableGroups, setAvailableGroups] = useState<string[]>(["Production"]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch("/api/v1/groups")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data && data.groups && Array.isArray(data.groups)) {
+            const names = data.groups.map((g: any) => g.name);
+            if (!names.includes("Production")) names.unshift("Production");
+            setAvailableGroups(names);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen]);
 
   // Close on Escape key
   useEffect(() => {
@@ -585,6 +601,22 @@ app.get("/health/db", async (req, res) => {
                       onChange={(e) => setGroupName(e.target.value)}
                       className="w-full bg-black border-2 border-zinc-700 p-2 text-xs text-white focus:border-cyan-400 outline-none"
                     />
+                    <div className="flex flex-wrap gap-1.5 pt-1.5">
+                      {availableGroups.map((tag) => (
+                        <button
+                          type="button"
+                          key={tag}
+                          onClick={() => setGroupName(tag)}
+                          className={`px-2 py-0.5 text-[9px] font-bold border transition ${
+                            groupName === tag
+                              ? "bg-cyan-950 border-cyan-400 text-cyan-300"
+                              : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
+                          }`}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 

@@ -3,6 +3,8 @@ import { getDb, initDb } from "../db.js";
 
 const router = Router();
 
+const DEFAULT_REDIRECT_URL = "https://crystal-heimdall.vercel.app/";
+
 function escapeXml(unsafe: string): string {
   return unsafe.replace(/[<>&'"]/g, (c) => {
     switch (c) {
@@ -16,29 +18,192 @@ function escapeXml(unsafe: string): string {
   });
 }
 
-function renderSvgBadge(label: string, value: string, color: string): string {
+function renderSvgBadge(
+  label: string,
+  value: string,
+  color: string,
+  redirectUrl: string = DEFAULT_REDIRECT_URL
+): string {
   const cleanLabel = escapeXml(label.trim());
   const cleanValue = escapeXml(value.trim());
+  const cleanLink = escapeXml((redirectUrl || DEFAULT_REDIRECT_URL).trim());
 
-  // Approximate character-width measurement for monospace font
+  // Approximate character-width measurement for monospace font (7.2px per char + 16px padding)
   const labelWidth = Math.max(40, Math.round(cleanLabel.length * 7.2 + 16));
   const valueWidth = Math.max(40, Math.round(cleanValue.length * 7.2 + 16));
   const totalWidth = labelWidth + valueWidth;
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="20" role="img" aria-label="${cleanLabel}: ${cleanValue}">
-  <title>${cleanLabel}: ${cleanValue}</title>
-  <g shape-rendering="crispEdges">
-    <rect width="${labelWidth}" height="20" fill="#18181b"/>
-    <rect x="${labelWidth}" width="${valueWidth}" height="20" fill="${color}"/>
-  </g>
-  <g fill="#fff" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="11" font-weight="700">
-    <text x="${Math.round(labelWidth / 2)}" y="14" fill="#a1a1aa">${cleanLabel}</text>
-    <text x="${labelWidth + Math.round(valueWidth / 2)}" y="14" fill="#ffffff">${cleanValue}</text>
-  </g>
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${totalWidth}" height="20" role="img" aria-label="${cleanLabel}: ${cleanValue}">
+  <title>${cleanLabel}: ${cleanValue} (Click to open Crystal Heimdall)</title>
+  <a xlink:href="${cleanLink}" href="${cleanLink}" target="_blank" rel="noopener noreferrer">
+    <g shape-rendering="crispEdges">
+      <rect width="${labelWidth}" height="20" fill="#18181b"/>
+      <rect x="${labelWidth}" width="${valueWidth}" height="20" fill="${color}"/>
+    </g>
+    <g fill="#fff" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="11" font-weight="700">
+      <text x="${Math.round(labelWidth / 2)}" y="14" fill="#a1a1aa">${cleanLabel}</text>
+      <text x="${labelWidth + Math.round(valueWidth / 2)}" y="14" fill="#ffffff">${cleanValue}</text>
+    </g>
+  </a>
 </svg>`;
 }
 
-// GET dynamic SVG status badge for fleet or individual target
+// Helper to handle project group badge generation
+async function handleProjectGroupBadge(groupParam: string, req: Request, res: Response) {
+  const db = getDb();
+  const group = decodeURIComponent(groupParam).trim();
+  const metric = (req.query.metric as string) || "status";
+  const customLabel = req.query.label as string | undefined;
+  const redirectUrl = (req.query.link as string) || DEFAULT_REDIRECT_URL;
+
+  // Find all public services in this project group
+  const svcRes = await db.execute({
+    sql: "SELECT status, uptime_pct, latency_ms FROM services WHERE LOWER(group_name) = LOWER(?) AND is_public = 1",
+    args: [group],
+  });
+
+  const services = svcRes.rows as any[];
+  const label = customLabel || group.toUpperCase();
+
+  // If no services tagged with this group, verify if group exists in project_groups
+  if (services.length === 0) {
+    const grpCheck = await db.execute({
+      sql: "SELECT name FROM project_groups WHERE LOWER(name) = LOWER(?) LIMIT 1",
+      args: [group],
+    });
+
+    if (grpCheck.rows.length === 0) {
+      const svg = renderSvgBadge(label, "PROJECT NOT FOUND", "#71717a", redirectUrl);
+      return res.send(svg);
+    }
+
+    if (metric === "uptime") {
+      const svg = renderSvgBadge(label, "100.0%", "#10b981", redirectUrl);
+      return res.send(svg);
+    }
+
+    if (metric === "latency") {
+      const svg = renderSvgBadge(label, "0ms", "#0284c7", redirectUrl);
+      return res.send(svg);
+    }
+
+    const svg = renderSvgBadge(label, "OPERATIONAL", "#10b981", redirectUrl);
+    return res.send(svg);
+  }
+
+  // Calculate project aggregate metrics
+  const hasCritical = services.some((s) => s.status === "critical");
+  const hasWarning = services.some((s) => s.status === "warning");
+  const allMaintenance = services.every((s) => s.status === "maintenance");
+  
+  const overallStatus = hasCritical ? "outage" : hasWarning ? "degraded" : allMaintenance ? "maintenance" : "operational";
+  const statusColor = hasCritical ? "#f43f5e" : hasWarning ? "#f59e0b" : allMaintenance ? "#0284c7" : "#10b981";
+
+  const avgUptime = Number(
+    (services.reduce((acc, s) => acc + (s.uptime_pct || 100), 0) / services.length).toFixed(2)
+  );
+
+  const avgLatency = Math.round(
+    services.reduce((acc, s) => acc + (s.latency_ms || 0), 0) / services.length
+  );
+
+  if (metric === "uptime") {
+    const uptimeColor = avgUptime >= 99.0 ? "#10b981" : avgUptime >= 95.0 ? "#f59e0b" : "#f43f5e";
+    const svg = renderSvgBadge(label, `${avgUptime}%`, uptimeColor, redirectUrl);
+    return res.send(svg);
+  }
+
+  if (metric === "latency") {
+    const svg = renderSvgBadge(label, `${avgLatency}ms`, "#0284c7", redirectUrl);
+    return res.send(svg);
+  }
+
+  const svg = renderSvgBadge(label, overallStatus.toUpperCase(), statusColor, redirectUrl);
+  return res.send(svg);
+}
+
+// Helper to handle individual service badge generation
+async function handleServiceBadge(serviceIdOrName: string, req: Request, res: Response) {
+  const db = getDb();
+  const metric = (req.query.metric as string) || "status";
+  const customLabel = req.query.label as string | undefined;
+  const redirectUrl = (req.query.link as string) || DEFAULT_REDIRECT_URL;
+
+  const svcRes = await db.execute({
+    sql: "SELECT * FROM services WHERE id = ? OR LOWER(name) = LOWER(?) LIMIT 1",
+    args: [serviceIdOrName, serviceIdOrName],
+  });
+
+  if (svcRes.rows.length === 0) {
+    const svg = renderSvgBadge(customLabel || "heimdall", "TARGET NOT FOUND", "#71717a", redirectUrl);
+    return res.send(svg);
+  }
+
+  const service = svcRes.rows[0] as any;
+  const label = customLabel || service.name;
+
+  if (metric === "uptime") {
+    const uptime = Number(service.uptime_pct || 100);
+    const uptimeColor = uptime >= 99.0 ? "#10b981" : uptime >= 95.0 ? "#f59e0b" : "#f43f5e";
+    const svg = renderSvgBadge(label, `${uptime.toFixed(1)}%`, uptimeColor, redirectUrl);
+    return res.send(svg);
+  }
+
+  if (metric === "latency") {
+    const svg = renderSvgBadge(label, `${service.latency_ms || 0}ms`, "#0284c7", redirectUrl);
+    return res.send(svg);
+  }
+
+  // Default: status metric
+  let statusText = service.status === "healthy" ? "online" : service.status;
+  let statusColor = "#10b981";
+
+  if (service.status === "critical") {
+    statusText = "down";
+    statusColor = "#f43f5e";
+  } else if (service.status === "warning") {
+    statusText = "degraded";
+    statusColor = "#f59e0b";
+  } else if (service.status === "maintenance" || service.is_maintenance === 1) {
+    statusText = "maintenance";
+    statusColor = "#0284c7";
+  }
+
+  const svg = renderSvgBadge(label, statusText.toUpperCase(), statusColor, redirectUrl);
+  return res.send(svg);
+}
+
+// GET dynamic SVG status badge for a specific project/environment group
+router.get("/project/:group/status.svg", async (req: Request, res: Response) => {
+  try {
+    await initDb();
+    res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    return await handleProjectGroupBadge(req.params.group, req, res);
+  } catch (err: any) {
+    const errorSvg = renderSvgBadge("error", "badge generator failed", "#f43f5e");
+    res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+    return res.status(500).send(errorSvg);
+  }
+});
+
+// GET dynamic SVG status badge for an individual service
+router.get("/service/:id/status.svg", async (req: Request, res: Response) => {
+  try {
+    await initDb();
+    res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    return await handleServiceBadge(req.params.id, req, res);
+  } catch (err: any) {
+    const errorSvg = renderSvgBadge("error", "badge generator failed", "#f43f5e");
+    res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+    return res.status(500).send(errorSvg);
+  }
+});
+
+// GET dynamic SVG status badge for fleet, project, or individual target
 router.get("/:id/status.svg", async (req: Request, res: Response) => {
   try {
     await initDb();
@@ -46,6 +211,7 @@ router.get("/:id/status.svg", async (req: Request, res: Response) => {
     const { id } = req.params;
     const metric = (req.query.metric as string) || "status";
     const customLabel = req.query.label as string | undefined;
+    const redirectUrl = (req.query.link as string) || DEFAULT_REDIRECT_URL;
 
     res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -68,56 +234,35 @@ router.get("/:id/status.svg", async (req: Request, res: Response) => {
 
       if (metric === "uptime") {
         const uptimeColor = avgUptime >= 99.0 ? "#10b981" : avgUptime >= 95.0 ? "#f59e0b" : "#f43f5e";
-        const svg = renderSvgBadge(customLabel || "FLEET UPTIME", `${avgUptime}%`, uptimeColor);
+        const svg = renderSvgBadge(customLabel || "FLEET UPTIME", `${avgUptime}%`, uptimeColor, redirectUrl);
         return res.send(svg);
       }
 
-      const svg = renderSvgBadge(customLabel || "FLEET STATUS", overallStatus.toUpperCase(), statusColor);
+      const svg = renderSvgBadge(customLabel || "FLEET STATUS", overallStatus.toUpperCase(), statusColor, redirectUrl);
       return res.send(svg);
     }
 
-    // Individual service target badge
+    // Check if ID matches a service
     const svcRes = await db.execute({
-      sql: "SELECT * FROM services WHERE id = ? OR name = ? LIMIT 1",
+      sql: "SELECT id FROM services WHERE id = ? OR LOWER(name) = LOWER(?) LIMIT 1",
       args: [id, id],
     });
 
-    if (svcRes.rows.length === 0) {
-      const svg = renderSvgBadge(customLabel || "heimdall", "target not found", "#71717a");
-      return res.send(svg);
+    if (svcRes.rows.length > 0) {
+      return await handleServiceBadge(id, req, res);
     }
 
-    const service = svcRes.rows[0] as any;
-    const label = customLabel || service.name;
+    // Check if ID matches a project group
+    const grpRes = await db.execute({
+      sql: "SELECT id FROM project_groups WHERE LOWER(name) = LOWER(?) OR id = ? LIMIT 1",
+      args: [id, id],
+    });
 
-    if (metric === "uptime") {
-      const uptime = Number(service.uptime_pct || 100);
-      const uptimeColor = uptime >= 99.0 ? "#10b981" : uptime >= 95.0 ? "#f59e0b" : "#f43f5e";
-      const svg = renderSvgBadge(label, `${uptime.toFixed(1)}%`, uptimeColor);
-      return res.send(svg);
+    if (grpRes.rows.length > 0) {
+      return await handleProjectGroupBadge(id, req, res);
     }
 
-    if (metric === "latency") {
-      const svg = renderSvgBadge(label, `${service.latency_ms || 0}ms`, "#0284c7");
-      return res.send(svg);
-    }
-
-    // Default: status metric
-    let statusText = service.status === "healthy" ? "online" : service.status;
-    let statusColor = "#10b981";
-
-    if (service.status === "critical") {
-      statusText = "down";
-      statusColor = "#f43f5e";
-    } else if (service.status === "warning") {
-      statusText = "degraded";
-      statusColor = "#f59e0b";
-    } else if (service.status === "maintenance" || service.is_maintenance === 1) {
-      statusText = "maintenance";
-      statusColor = "#0284c7";
-    }
-
-    const svg = renderSvgBadge(label, statusText.toUpperCase(), statusColor);
+    const svg = renderSvgBadge(customLabel || "heimdall", "TARGET NOT FOUND", "#71717a", redirectUrl);
     return res.send(svg);
   } catch (err: any) {
     const errorSvg = renderSvgBadge("error", "badge generator failed", "#f43f5e");

@@ -28,9 +28,31 @@ import {
   Server,
   Webhook,
   Rss,
-  ExternalLink
+  ExternalLink,
+  Plus,
+  Edit2,
+  RefreshCw,
+  FolderPlus,
+  Tag
 } from "lucide-react";
 import { useToast } from "../lib/ToastContext";
+
+export interface ProjectGroup {
+  id: string;
+  name: string;
+  environment: "production" | "staging" | "development" | "edge";
+  color: string;
+  description: string;
+  created_at: number;
+  service_count: number;
+  healthy_count: number;
+  warning_count: number;
+  critical_count: number;
+  maintenance_count: number;
+  avg_uptime: number;
+  avg_latency: number;
+  status: string;
+}
 
 interface StatusSettings {
   page_title: string;
@@ -59,7 +81,9 @@ interface AdvancedSettings {
 
 export default function SettingsPage() {
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<"status" | "alerts" | "inbound" | "security" | "advanced">("status");
+  const [activeTab, setActiveTab] = useState<
+    "status" | "groups" | "badges" | "alerts" | "inbound" | "security" | "advanced"
+  >("status");
 
   // Status Page Configuration (Uptime Kuma Style)
   const [statusSettings, setStatusSettings] = useState<StatusSettings>({
@@ -92,8 +116,145 @@ export default function SettingsPage() {
   const [isSavingAdvanced, setIsSavingAdvanced] = useState(false);
   const [isPurging, setIsPurging] = useState(false);
 
+  // Dynamic Project & Environment Groups State
+  const [groups, setGroups] = useState<ProjectGroup[]>([]);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<ProjectGroup | null>(null);
+  const [groupForm, setGroupForm] = useState<{
+    name: string;
+    environment: "production" | "staging" | "development" | "edge";
+    color: string;
+    description: string;
+  }>({
+    name: "",
+    environment: "production",
+    color: "#06b6d4",
+    description: "",
+  });
+  const [isSavingGroup, setIsSavingGroup] = useState(false);
+
+  // Dynamic Badges Hub State
+  const [allServices, setAllServices] = useState<{ id: string; name: string; group_name?: string }[]>([]);
+  const [badgeScope, setBadgeScope] = useState<"fleet" | "group" | "service">("fleet");
+  const [selectedBadgeGroup, setSelectedBadgeGroup] = useState<string>("Production");
+  const [selectedBadgeService, setSelectedBadgeService] = useState<string>("");
+  const [badgeMetric, setBadgeMetric] = useState<"status" | "uptime" | "latency">("status");
+  const [badgeCustomLabel, setBadgeCustomLabel] = useState<string>("");
+  const [badgeRedirectUrl, setBadgeRedirectUrl] = useState<string>("https://crystal-heimdall.vercel.app/");
+
+  const fetchGroups = async () => {
+    setIsLoadingGroups(true);
+    try {
+      const res = await fetch("/api/v1/groups");
+      const data = await res.json();
+      if (data && data.groups && Array.isArray(data.groups)) {
+        setGroups(data.groups);
+        if (data.groups.length > 0 && !selectedBadgeGroup) {
+          setSelectedBadgeGroup(data.groups[0].name);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch groups", err);
+    } finally {
+      setIsLoadingGroups(false);
+    }
+  };
+
+  const fetchServicesForBadges = async () => {
+    try {
+      const res = await fetch("/api/v1/services");
+      const data = await res.json();
+      if (data && Array.isArray(data)) {
+        setAllServices(data);
+        if (data.length > 0 && !selectedBadgeService) {
+          setSelectedBadgeService(data[0].id);
+        }
+      }
+    } catch {}
+  };
+
+  const handleOpenCreateGroup = () => {
+    setEditingGroup(null);
+    setGroupForm({
+      name: "",
+      environment: "production",
+      color: "#06b6d4",
+      description: "",
+    });
+    setIsGroupModalOpen(true);
+  };
+
+  const handleOpenEditGroup = (g: ProjectGroup) => {
+    setEditingGroup(g);
+    setGroupForm({
+      name: g.name,
+      environment: g.environment || "production",
+      color: g.color || "#06b6d4",
+      description: g.description || "",
+    });
+    setIsGroupModalOpen(true);
+  };
+
+  const handleSaveGroup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = groupForm.name.trim();
+    if (!trimmed) {
+      toast.error("Group name is required");
+      return;
+    }
+    setIsSavingGroup(true);
+    try {
+      const isEdit = Boolean(editingGroup);
+      const url = isEdit ? `/api/v1/groups/${editingGroup!.id}` : "/api/v1/groups";
+      const method = isEdit ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(groupForm),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(isEdit ? `Group '${trimmed}' updated successfully!` : `Group '${trimmed}' created!`);
+        setIsGroupModalOpen(false);
+        fetchGroups();
+      } else {
+        toast.error(data.error || "Failed to save project group");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Network error saving project group");
+    } finally {
+      setIsSavingGroup(false);
+    }
+  };
+
+  const handleDeleteGroup = async (g: ProjectGroup) => {
+    if (g.name.toLowerCase() === "production" && groups.length <= 1) {
+      toast.error("Cannot delete the default Production group.");
+      return;
+    }
+    if (!window.confirm(`Are you sure you want to delete group '${g.name}'? All member services will be reassigned to 'Production'.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/v1/groups/${g.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message || `Group '${g.name}' deleted.`);
+        fetchGroups();
+      } else {
+        toast.error(data.error || "Failed to delete group");
+      }
+    } catch {
+      toast.error("Network error deleting group");
+    }
+  };
+
   // Load Status Page & Advanced settings from server
   useEffect(() => {
+    fetchGroups();
+    fetchServicesForBadges();
+
     fetch("/api/v1/status/settings")
       .then((r) => r.json())
       .then((data) => {
@@ -393,18 +554,20 @@ curl -fsS -m 10 --retry 3 https://status.crystalstudio.labs/api/v1/ping/YOUR_API
         </div>
 
         {/* TOP TAB CONTROLS (INDUSTRIAL BRUTALIST ROCKER TABS) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
           {[
-            { id: "status", label: "[01] STATUS PAGE EDITOR" },
-            { id: "advanced", label: "[02] UPTIME KUMA ENGINE" },
-            { id: "alerts", label: "[03] DISPATCH CONDUITS" },
-            { id: "inbound", label: "[04] INBOUND SINKS" },
-            { id: "security", label: "[05] ACCESS & SECURITY" },
+            { id: "status", label: "[01] STATUS PAGE" },
+            { id: "groups", label: "[02] GROUPS & ENVS" },
+            { id: "badges", label: "[03] SVG BADGES" },
+            { id: "advanced", label: "[04] UPTIME ENGINE" },
+            { id: "alerts", label: "[05] DISPATCH" },
+            { id: "inbound", label: "[06] INBOUND SINKS" },
+            { id: "security", label: "[07] SECURITY" },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`p-3 text-xs font-bold font-mono border-2 transition-all text-center uppercase ${
+              className={`p-2.5 text-[11px] font-bold font-mono border-2 transition-all text-center uppercase tracking-tight flex items-center justify-center ${
                 activeTab === tab.id
                   ? "bg-zinc-800 text-emerald-300 border-emerald-400 shadow-[3px_3px_0px_#000]"
                   : "bg-zinc-950 text-zinc-400 border-zinc-800 hover:border-zinc-700 hover:text-white"
@@ -613,7 +776,452 @@ curl -fsS -m 10 --retry 3 https://status.crystalstudio.labs/api/v1/ping/YOUR_API
           </div>
         )}
 
-        {/* TAB 2: UPTIME KUMA ADVANCED ENGINE & RETENTION */}
+        {/* TAB 2: GROUPS & ENVIRONMENTS */}
+        {activeTab === "groups" && (
+          <div className="space-y-6">
+            <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 sm:p-8 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-zinc-800 pb-4">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2 text-xs text-cyan-400 font-bold">
+                    <Layers className="w-4 h-4 text-cyan-400" />
+                    <span>[PROJECT & ENVIRONMENT NAMESPACES]</span>
+                  </div>
+                  <h2 className="text-base sm:text-lg font-black text-white uppercase">
+                    Project & Environment Groups
+                  </h2>
+                  <p className="text-xs text-zinc-400 font-sans">
+                    Configure custom environments, project clusters, and microservice tiers. Group changes cascade dynamically to dashboard filters and SVG badges.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <button
+                    onClick={fetchGroups}
+                    disabled={isLoadingGroups}
+                    className="p-2.5 bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white text-xs font-bold font-mono transition"
+                    title="Refresh groups"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingGroups ? "animate-spin text-cyan-400" : ""}`} />
+                  </button>
+
+                  <button
+                    onClick={handleOpenCreateGroup}
+                    className="px-4 py-2.5 btn-primary text-xs flex items-center gap-2 shadow-[2px_2px_0px_#000]"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>[ + CREATE NEW GROUP ]</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Group Cards Grid */}
+              {isLoadingGroups ? (
+                <div className="p-12 text-center text-xs text-zinc-500 font-mono">
+                  <RefreshCw className="w-6 h-6 animate-spin mx-auto text-cyan-400 mb-2" />
+                  LOADING PROJECT GROUPS...
+                </div>
+              ) : groups.length === 0 ? (
+                <div className="p-8 border-2 border-dashed border-zinc-800 text-center space-y-3">
+                  <FolderPlus className="w-8 h-8 text-zinc-600 mx-auto" />
+                  <p className="text-xs text-zinc-400">No project groups created yet.</p>
+                  <button
+                    onClick={handleOpenCreateGroup}
+                    className="px-4 py-2 btn-primary text-xs"
+                  >
+                    [ CREATE FIRST GROUP ]
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {groups.map((g) => {
+                    const envColor =
+                      g.environment === "production"
+                        ? "text-emerald-400 border-emerald-500 bg-emerald-950/30"
+                        : g.environment === "staging"
+                        ? "text-fuchsia-400 border-fuchsia-500 bg-fuchsia-950/30"
+                        : g.environment === "development"
+                        ? "text-purple-400 border-purple-500 bg-purple-950/30"
+                        : "text-cyan-400 border-cyan-500 bg-cyan-950/30";
+
+                    return (
+                      <div
+                        key={g.id}
+                        className="bg-black border-2 border-zinc-800 hover:border-zinc-700 transition flex flex-col justify-between shadow-[3px_3px_0px_#000] relative overflow-hidden"
+                      >
+                        {/* Accent line on top */}
+                        <div
+                          className="h-1.5 w-full"
+                          style={{ backgroundColor: g.color || "#06b6d4" }}
+                        />
+
+                        <div className="p-4 space-y-3 flex-1">
+                          {/* Card Header */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: g.color || "#06b6d4" }}
+                                />
+                                <h3 className="font-black text-white text-sm uppercase truncate">
+                                  {g.name}
+                                </h3>
+                              </div>
+                              <span
+                                className={`inline-block px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase border ${envColor}`}
+                              >
+                                {g.environment}
+                              </span>
+                            </div>
+
+                            {/* Card Header Actions */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => handleOpenEditGroup(g)}
+                                className="p-1.5 bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white text-xs transition"
+                                title="Edit group name or properties"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteGroup(g)}
+                                disabled={g.name.toLowerCase() === "production" && groups.length <= 1}
+                                className={`p-1.5 bg-zinc-900 border border-zinc-700 text-xs transition ${
+                                  g.name.toLowerCase() === "production" && groups.length <= 1
+                                    ? "text-zinc-600 cursor-not-allowed"
+                                    : "text-rose-400 hover:bg-rose-950/50 hover:border-rose-500"
+                                }`}
+                                title="Delete group"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Description */}
+                          <p className="text-xs text-zinc-400 font-sans leading-relaxed line-clamp-2 min-h-[2rem]">
+                            {g.description || "Active sentinel environment namespace."}
+                          </p>
+
+                          {/* Stats Grid */}
+                          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800 text-[11px] font-mono">
+                            <div className="bg-zinc-950 p-2 border border-zinc-800/80">
+                              <span className="text-zinc-500 block text-[9px] uppercase">TARGETS</span>
+                              <span className="font-bold text-white text-xs">
+                                {g.service_count} {g.service_count === 1 ? "Service" : "Services"}
+                              </span>
+                            </div>
+
+                            <div className="bg-zinc-950 p-2 border border-zinc-800/80">
+                              <span className="text-zinc-500 block text-[9px] uppercase">30D UPTIME</span>
+                              <span
+                                className={`font-bold text-xs ${
+                                  g.avg_uptime >= 99.0
+                                    ? "text-emerald-400"
+                                    : g.avg_uptime >= 95.0
+                                    ? "text-amber-400"
+                                    : "text-rose-400"
+                                }`}
+                              >
+                                {g.avg_uptime}%
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Live Target Status Pills */}
+                          <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+                            <span className="flex items-center gap-1 text-emerald-400">
+                              <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />
+                              {g.healthy_count} OK
+                            </span>
+                            {g.warning_count > 0 && (
+                              <span className="flex items-center gap-1 text-amber-400">
+                                <span className="w-1.5 h-1.5 bg-amber-400 rounded-full" />
+                                {g.warning_count} WARN
+                              </span>
+                            )}
+                            {g.critical_count > 0 && (
+                              <span className="flex items-center gap-1 text-rose-400">
+                                <span className="w-1.5 h-1.5 bg-rose-400 rounded-full animate-pulse" />
+                                {g.critical_count} DOWN
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Card Footer Button */}
+                        <div className="p-3 bg-zinc-950 border-t border-zinc-800 flex items-center justify-between gap-2">
+                          <button
+                            onClick={() => {
+                              setBadgeScope("group");
+                              setSelectedBadgeGroup(g.name);
+                              setActiveTab("badges");
+                            }}
+                            className="w-full py-1.5 px-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-cyan-300 hover:text-cyan-200 text-[11px] font-bold uppercase font-mono flex items-center justify-center gap-1.5 transition"
+                          >
+                            <Shield className="w-3.5 h-3.5" />
+                            <span>[ GET PROJECT BADGE ]</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: DYNAMIC SVG BADGES HUB */}
+        {activeTab === "badges" && (
+          <div className="space-y-6">
+            <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 sm:p-8 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-zinc-800 pb-4">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2 text-xs text-emerald-400 font-bold">
+                    <Shield className="w-4 h-4 text-emerald-400" />
+                    <span>[EMBEDDABLE SVG STATUS SHIELDS & MARKDOWN GENERATOR]</span>
+                  </div>
+                  <h2 className="text-base sm:text-lg font-black text-white uppercase">
+                    Dynamic SVG Badges Hub
+                  </h2>
+                  <p className="text-xs text-zinc-400 font-sans">
+                    Generate real-time SVG status & uptime badges for individual projects, services, or the entire fleet. All badges natively hyperlink directly to <span className="text-emerald-300 font-mono">https://crystal-heimdall.vercel.app/</span> when clicked.
+                  </p>
+                </div>
+              </div>
+
+              {/* Badges Customizer Controls Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-black p-5 border-2 border-zinc-800">
+                {/* Control 1: Target Scope */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-zinc-300 uppercase block font-mono">
+                    // 1. SELECT BADGE SCOPE //
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { id: "fleet", label: "FLEET-WIDE" },
+                      { id: "group", label: "BY PROJECT GROUP" },
+                      { id: "service", label: "INDIVIDUAL SERVICE" },
+                    ].map((scope) => (
+                      <button
+                        type="button"
+                        key={scope.id}
+                        onClick={() => setBadgeScope(scope.id as any)}
+                        className={`p-2 text-[10px] font-bold font-mono border transition text-center uppercase ${
+                          badgeScope === scope.id
+                            ? "bg-cyan-950 border-cyan-400 text-cyan-300"
+                            : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        {scope.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Target Selector Dropdown if Project Group or Service */}
+                  {badgeScope === "group" && (
+                    <div className="pt-2">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase block font-mono mb-1">
+                        Select Project Group:
+                      </label>
+                      <select
+                        value={selectedBadgeGroup}
+                        onChange={(e) => setSelectedBadgeGroup(e.target.value)}
+                        className="w-full p-2 bg-zinc-950 border border-zinc-700 text-white font-mono text-xs focus:border-cyan-400 outline-none"
+                      >
+                        {groups.map((g) => (
+                          <option key={g.id} value={g.name}>
+                            {g.name} ({g.environment.toUpperCase()} • {g.service_count} services)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {badgeScope === "service" && (
+                    <div className="pt-2">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase block font-mono mb-1">
+                        Select Monitored Service:
+                      </label>
+                      <select
+                        value={selectedBadgeService}
+                        onChange={(e) => setSelectedBadgeService(e.target.value)}
+                        className="w-full p-2 bg-zinc-950 border border-zinc-700 text-white font-mono text-xs focus:border-cyan-400 outline-none"
+                      >
+                        {allServices.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} [{s.group_name || "Production"}]
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Control 2: Metric Type & Custom Label */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-zinc-300 uppercase block font-mono">
+                    // 2. METRIC & CUSTOM LABEL //
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { id: "status", label: "STATUS (ONLINE/DOWN)" },
+                      { id: "uptime", label: "UPTIME (30-DAY %)" },
+                      { id: "latency", label: "LATENCY (MS)" },
+                    ].map((m) => (
+                      <button
+                        type="button"
+                        key={m.id}
+                        onClick={() => setBadgeMetric(m.id as any)}
+                        className={`p-2 text-[10px] font-bold font-mono border transition text-center uppercase ${
+                          badgeMetric === m.id
+                            ? "bg-emerald-950 border-emerald-400 text-emerald-300"
+                            : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="pt-2">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase block font-mono mb-1">
+                      Custom Label Override (Optional):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={
+                        badgeScope === "fleet"
+                          ? "FLEET STATUS"
+                          : badgeScope === "group"
+                          ? selectedBadgeGroup || "PROJECT STATUS"
+                          : "SERVICE STATUS"
+                      }
+                      value={badgeCustomLabel}
+                      onChange={(e) => setBadgeCustomLabel(e.target.value)}
+                      className="w-full p-2 bg-zinc-950 border border-zinc-700 text-white font-mono text-xs focus:border-cyan-400 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Control 3: Target Redirect URL (Span 2) */}
+                <div className="md:col-span-2 space-y-1 pt-2 border-t border-zinc-800">
+                  <label className="text-[11px] font-bold text-zinc-300 uppercase block font-mono">
+                    // 3. ON-CLICK REDIRECT DESTINATION //
+                  </label>
+                  <input
+                    type="url"
+                    value={badgeRedirectUrl}
+                    onChange={(e) => setBadgeRedirectUrl(e.target.value)}
+                    placeholder="https://crystal-heimdall.vercel.app/"
+                    className="w-full p-2 bg-zinc-950 border border-zinc-700 text-emerald-300 font-mono text-xs focus:border-cyan-400 outline-none"
+                  />
+                  <p className="text-[10px] text-zinc-500 font-mono">
+                    [INTERACTIVE SVG EMBEDDING]: Clicking the SVG badge in any browser or markdown viewer triggers direct navigation to this URL.
+                  </p>
+                </div>
+              </div>
+
+              {/* Live Interactive Preview Card */}
+              {(() => {
+                const origin = typeof window !== "undefined" ? window.location.origin : "https://crystal-heimdall.vercel.app";
+                let path = "/api/v1/badges/fleet/status.svg";
+                if (badgeScope === "group") {
+                  path = `/api/v1/badges/project/${encodeURIComponent(selectedBadgeGroup || "Production")}/status.svg`;
+                } else if (badgeScope === "service") {
+                  path = `/api/v1/badges/service/${encodeURIComponent(selectedBadgeService || allServices[0]?.id || "srv-auth")}/status.svg`;
+                }
+
+                const params = new URLSearchParams();
+                if (badgeMetric !== "status") params.set("metric", badgeMetric);
+                if (badgeCustomLabel.trim()) params.set("label", badgeCustomLabel.trim());
+                const cleanRedirect = badgeRedirectUrl.trim() || "https://crystal-heimdall.vercel.app/";
+                if (cleanRedirect !== "https://crystal-heimdall.vercel.app/") {
+                  params.set("link", cleanRedirect);
+                }
+
+                const qs = params.toString();
+                const badgeSvgUrl = `${origin}${path}${qs ? `?${qs}` : ""}`;
+                const displayLabel = badgeCustomLabel.trim() || (badgeScope === "fleet" ? "Fleet Status" : badgeScope === "group" ? selectedBadgeGroup : "Service Status");
+
+                const markdownSnippet = `[![${displayLabel}](${badgeSvgUrl})](${cleanRedirect})`;
+                const htmlSnippet = `<a href="${cleanRedirect}" target="_blank" rel="noopener noreferrer">\n  <img src="${badgeSvgUrl}" alt="${displayLabel}" />\n</a>`;
+
+                return (
+                  <div className="space-y-6">
+                    {/* Live Badge Preview Box */}
+                    <div className="p-6 bg-black border-2 border-emerald-500/60 shadow-[4px_4px_0px_#10b981] flex flex-col items-center justify-center gap-3">
+                      <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                        // LIVE INTERACTIVE SHIELD PREVIEW //
+                      </span>
+                      
+                      <div className="p-4 bg-zinc-950 border border-zinc-800 flex items-center justify-center">
+                        <a
+                          href={cleanRedirect}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block hover:opacity-90 transition-transform active:scale-95"
+                          title={`Click badge to test redirect to ${cleanRedirect}`}
+                        >
+                          <img src={badgeSvgUrl} alt={displayLabel} className="h-6" />
+                        </a>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-xs font-mono text-emerald-400">
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                        <span>Interactive SVG: Click the badge above to test live redirect to {cleanRedirect}</span>
+                      </div>
+                    </div>
+
+                    {/* Code Snippets Box */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Markdown Snippet */}
+                      <div className="bg-black border border-zinc-800 p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-white uppercase font-mono flex items-center gap-1.5">
+                            <Code2 className="w-3.5 h-3.5 text-cyan-400" />
+                            GitHub README Markdown
+                          </span>
+                          <button
+                            onClick={() => handleCopy("md-badge", markdownSnippet)}
+                            className="px-2.5 py-1 bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white text-xs font-bold font-mono transition"
+                          >
+                            {copiedKey === "md-badge" ? "COPIED" : "COPY MD"}
+                          </button>
+                        </div>
+                        <pre className="p-2.5 bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-300 font-mono overflow-x-auto">
+                          {markdownSnippet}
+                        </pre>
+                      </div>
+
+                      {/* HTML Snippet */}
+                      <div className="bg-black border border-zinc-800 p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-white uppercase font-mono flex items-center gap-1.5">
+                            <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                            HTML Link &amp; Image Embed
+                          </span>
+                          <button
+                            onClick={() => handleCopy("html-badge", htmlSnippet)}
+                            className="px-2.5 py-1 bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white text-xs font-bold font-mono transition"
+                          >
+                            {copiedKey === "html-badge" ? "COPIED" : "COPY HTML"}
+                          </button>
+                        </div>
+                        <pre className="p-2.5 bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-300 font-mono overflow-x-auto">
+                          {htmlSnippet}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: UPTIME KUMA ADVANCED ENGINE & RETENTION */}
         {activeTab === "advanced" && (
           <div className="space-y-6">
             <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 sm:p-8 space-y-6">
@@ -1213,7 +1821,7 @@ curl -fsS -m 10 --retry 3 https://status.crystalstudio.labs/api/v1/ping/YOUR_API
           </div>
         )}
 
-        {/* TAB 4: ACCESS & SECURITY */}
+        {/* TAB 7: ACCESS & SECURITY */}
         {activeTab === "security" && (
           <div className="bg-[#0b0f17] border-2 border-emerald-500/50 shadow-[4px_4px_0px_#000] p-6 sm:p-8 space-y-4">
             <div className="flex items-center space-x-3">
@@ -1225,6 +1833,150 @@ curl -fsS -m 10 --retry 3 https://status.crystalstudio.labs/api/v1/ping/YOUR_API
             <p className="text-xs text-zinc-300 leading-relaxed font-sans">
               Crystal-Heimdall strictly isolates operator commands behind direct Two-Factor Authentication (2FA Only). There are no master passcodes and no GitHub OAuth dependencies. Operators authenticate directly using a rolling 6-digit Time-based One-Time Password (RFC 6238 TOTP) from Google Authenticator, Ente Auth, or 1Password. In development and testing environments, bypass code <code className="text-emerald-400 font-mono font-bold">000000</code> is accepted.
             </p>
+          </div>
+        )}
+
+        {/* CREATE / EDIT PROJECT GROUP MODAL */}
+        {isGroupModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 font-mono text-xs overflow-y-auto"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setIsGroupModalOpen(false);
+            }}
+          >
+            <div className="bg-[#0b0f17] border-2 border-cyan-500 shadow-[6px_6px_0px_#06b6d4] max-w-lg w-full p-6 space-y-5 relative">
+              <div className="flex items-center justify-between border-b-2 border-zinc-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 bg-cyan-950 border border-cyan-400 flex items-center justify-center text-cyan-400 font-bold">
+                    <FolderPlus className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-black text-sm uppercase text-white">
+                    {editingGroup ? "// EDIT PROJECT GROUP //" : "// CREATE PROJECT GROUP //"}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsGroupModalOpen(false)}
+                  className="p-1 bg-zinc-900 border border-zinc-700 text-zinc-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveGroup} className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-1">
+                    GROUP / PROJECT NAME *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={groupForm.name}
+                    onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
+                    placeholder="e.g. Campus Relay, KrishiSetu, Internal APIs"
+                    className="w-full p-2.5 bg-black border border-zinc-700 text-white font-mono text-xs focus:border-cyan-400 outline-none"
+                  />
+                  {editingGroup && (
+                    <p className="text-[10px] text-amber-400 mt-1 font-sans">
+                      ⚠️ Renaming will cascade update all linked services in the database automatically.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-1">
+                    ENVIRONMENT TIER
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { id: "production", label: "PROD" },
+                      { id: "staging", label: "STAGING" },
+                      { id: "development", label: "DEV" },
+                      { id: "edge", label: "EDGE" },
+                    ].map((env) => (
+                      <button
+                        type="button"
+                        key={env.id}
+                        onClick={() => setGroupForm({ ...groupForm, environment: env.id as any })}
+                        className={`p-2 text-[10px] font-bold border transition uppercase text-center ${
+                          groupForm.environment === env.id
+                            ? "bg-cyan-950 border-cyan-400 text-cyan-300"
+                            : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        {env.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-1">
+                    ACCENT COLOR
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      "#10b981",
+                      "#06b6d4",
+                      "#3b82f6",
+                      "#8b5cf6",
+                      "#f59e0b",
+                      "#ec4899",
+                      "#f43f5e",
+                      "#64748b",
+                    ].map((col) => (
+                      <button
+                        type="button"
+                        key={col}
+                        onClick={() => setGroupForm({ ...groupForm, color: col })}
+                        className={`w-6 h-6 border-2 transition ${
+                          groupForm.color.toLowerCase() === col.toLowerCase()
+                            ? "border-white scale-110 shadow-[0_0_6px_#fff]"
+                            : "border-transparent opacity-80 hover:opacity-100"
+                        }`}
+                        style={{ backgroundColor: col }}
+                      />
+                    ))}
+                    <input
+                      type="text"
+                      value={groupForm.color}
+                      onChange={(e) => setGroupForm({ ...groupForm, color: e.target.value })}
+                      placeholder="#06b6d4"
+                      className="w-24 p-1.5 bg-black border border-zinc-700 text-white font-mono text-[11px] focus:border-cyan-400 outline-none text-center"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-1">
+                    DESCRIPTION (OPTIONAL)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={groupForm.description}
+                    onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })}
+                    placeholder="Short description of this environment or project scope..."
+                    className="w-full p-2.5 bg-black border border-zinc-700 text-white font-mono text-xs focus:border-cyan-400 outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => setIsGroupModalOpen(false)}
+                    className="px-4 py-2 bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white text-xs font-bold"
+                  >
+                    [ CANCEL ]
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingGroup}
+                    className="px-5 py-2 btn-primary text-xs font-bold"
+                  >
+                    {isSavingGroup ? "SAVING..." : editingGroup ? "[ UPDATE GROUP ]" : "[ CREATE GROUP ]"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </main>

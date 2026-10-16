@@ -66,6 +66,7 @@ import analyticsRoutes from "./routes/analytics.js";
 import channelsRoutes from "./routes/channels.js";
 import telemetryRoutes from "./routes/telemetry.js";
 import badgesRoutes from "./routes/badges.js";
+import groupsRoutes from "./routes/groups.js";
 import { getRssFeedHandler } from "./routes/status.js";
 
 // Root API Health Endpoint
@@ -93,6 +94,7 @@ app.get([
 // Mount API Routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/services", servicesRoutes);
+app.use("/api/v1/groups", groupsRoutes);
 app.use("/api/v1/status", statusRoutes);
 app.use("/api/v1/badges", badgesRoutes);
 app.use("/api/v1/alerts", alertsRoutes);

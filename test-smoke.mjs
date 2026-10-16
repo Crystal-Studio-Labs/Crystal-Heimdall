@@ -790,7 +790,98 @@ async function runSmokeTests() {
   }
   console.log(`   ✅ PWA Manifest shortcuts & display_override verified (${pwaManifest.shortcuts.length} shortcuts registered).`);
 
-  console.log("\n🎉 ALL 26 COMPREHENSIVE VERIFICATION TESTS PASSED NOMINAL! 🎉");
+  // 27. Test Dynamic Project & Environment Groups CRUD (/api/v1/groups)
+  console.log("\n27. TEST DYNAMIC PROJECT & ENVIRONMENT GROUPS (/api/v1/groups)");
+  const listGroupsRes = await fetch(`${BASE_URL}/api/v1/groups`);
+  const listGroupsData = await listGroupsRes.json();
+  if (!listGroupsRes.ok || !Array.isArray(listGroupsData.groups)) {
+    throw new Error(`Failed to list project groups: ${JSON.stringify(listGroupsData)}`);
+  }
+  const hasProductionGroup = listGroupsData.groups.some((g) => g.name.toLowerCase() === "production");
+  if (!hasProductionGroup) {
+    throw new Error("Default 'Production' group missing from project_groups table!");
+  }
+  console.log(`   ✅ Listed ${listGroupsData.groups.length} project groups with telemetry enrichment.`);
+
+  // Create new custom group
+  const testGroupName = `DevRel Edge Cluster [${Date.now().toString(36)}]`;
+  const createGroupRes = await fetch(`${BASE_URL}/api/v1/groups`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: testGroupName,
+      environment: "edge",
+      color: "#ec4899",
+      description: "Automated edge telemetry and distributed canary nodes",
+    }),
+  });
+  const createGroupData = await createGroupRes.json();
+  if (!createGroupRes.ok || createGroupData.status !== "success" || !createGroupData.group?.id) {
+    throw new Error(`Failed to create project group: ${JSON.stringify(createGroupData)}`);
+  }
+  const createdGroupId = createGroupData.group.id;
+  console.log(`   ✅ Created custom project group: '${testGroupName}' (ID: ${createdGroupId})`);
+
+  // Update/Rename custom group
+  const updatedGroupName = `${testGroupName} Renamed`;
+  const updateGroupRes = await fetch(`${BASE_URL}/api/v1/groups/${createdGroupId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: updatedGroupName,
+      environment: "staging",
+      color: "#8b5cf6",
+      description: "Updated description for canary pipeline",
+    }),
+  });
+  const updateGroupData = await updateGroupRes.json();
+  if (!updateGroupRes.ok || updateGroupData.group.name !== updatedGroupName || updateGroupData.group.environment !== "staging") {
+    throw new Error(`Failed to update project group: ${JSON.stringify(updateGroupData)}`);
+  }
+  console.log(`   ✅ Updated project group: '${updatedGroupName}' with cascade support.`);
+
+  // Delete custom group
+  const deleteGroupRes = await fetch(`${BASE_URL}/api/v1/groups/${createdGroupId}`, {
+    method: "DELETE",
+  });
+  const deleteGroupData = await deleteGroupRes.json();
+  if (!deleteGroupRes.ok || deleteGroupData.status !== "success") {
+    throw new Error(`Failed to delete project group: ${JSON.stringify(deleteGroupData)}`);
+  }
+  console.log(`   ✅ Deleted project group '${updatedGroupName}' and safely reassigned orphaned services.`);
+
+  // 28. Test Interactive Clickable SVG Badges with Redirection (https://crystal-heimdall.vercel.app/)
+  console.log("\n28. TEST INTERACTIVE SVG BADGES & REDIRECTIONS (/api/v1/badges)");
+  const projBadgeRes = await fetch(`${BASE_URL}/api/v1/badges/project/Campus%20Relay/status.svg`);
+  const projBadgeSvg = await projBadgeRes.text();
+  const projBadgeType = projBadgeRes.headers.get("content-type");
+  if (!projBadgeRes.ok || !projBadgeType?.includes("image/svg+xml")) {
+    throw new Error(`Project group badge returned invalid Content-Type: ${projBadgeType}`);
+  }
+  if (!projBadgeSvg.includes("<svg") || !projBadgeSvg.includes("CAMPUS RELAY")) {
+    throw new Error(`Project group badge SVG malformed: ${projBadgeSvg.substring(0, 100)}`);
+  }
+  // Verify embedded clickable link to crystal-heimdall.vercel.app
+  if (!projBadgeSvg.includes("href=\"https://crystal-heimdall.vercel.app/\"") || !projBadgeSvg.includes("target=\"_blank\"")) {
+    throw new Error(`Project group badge missing embedded clickable redirect link to https://crystal-heimdall.vercel.app/!`);
+  }
+  console.log("   ✅ Project group SVG badge verified for [Campus Relay] with embedded redirect link.");
+
+  const projUptimeBadgeRes = await fetch(`${BASE_URL}/api/v1/badges/project/Campus%20Relay/status.svg?metric=uptime`);
+  const projUptimeBadgeSvg = await projUptimeBadgeRes.text();
+  if (!projUptimeBadgeRes.ok || !projUptimeBadgeSvg.includes("%") || !projUptimeBadgeSvg.includes("https://crystal-heimdall.vercel.app/")) {
+    throw new Error(`Project group uptime badge malformed: ${projUptimeBadgeSvg.substring(0, 100)}`);
+  }
+  console.log("   ✅ Project group uptime SVG badge verified with percentage metric and redirect link.");
+
+  const singleSvcBadgeRes = await fetch(`${BASE_URL}/api/v1/badges/service/srv-auth/status.svg`);
+  const singleSvcBadgeSvg = await singleSvcBadgeRes.text();
+  if (!singleSvcBadgeRes.ok || !singleSvcBadgeSvg.includes("Crystal Auth Gateway") || !singleSvcBadgeSvg.includes("https://crystal-heimdall.vercel.app/")) {
+    throw new Error(`Single service badge malformed: ${singleSvcBadgeSvg.substring(0, 100)}`);
+  }
+  console.log("   ✅ Single service SVG badge verified (/service/srv-auth/status.svg) with embedded redirect link.");
+
+  console.log("\n🎉 ALL 28 COMPREHENSIVE VERIFICATION TESTS PASSED NOMINAL! 🎉");
   } finally {
     if (serverInstance) {
       console.log("\n🧹 Closing temporary test server instance...");

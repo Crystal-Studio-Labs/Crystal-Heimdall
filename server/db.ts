@@ -143,6 +143,18 @@ export async function initDb(): Promise<void> {
     );
   `);
 
+  // Project & Environment Groups Table (User-Managed Dynamic Groups)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS project_groups (
+      id TEXT PRIMARY KEY,
+      name TEXT UNIQUE NOT NULL,
+      environment TEXT DEFAULT 'production',
+      color TEXT DEFAULT '#06b6d4',
+      description TEXT,
+      created_at INTEGER NOT NULL
+    );
+  `);
+
   // Migrations: Ensure additional columns exist on services for Uptime Kuma/Robot features
   const alterColumns = [
     "ALTER TABLE services ADD COLUMN is_public INTEGER DEFAULT 1",
@@ -344,6 +356,45 @@ export async function initDb(): Promise<void> {
     }
   } catch {
     // Ignore migration error if table empty
+  }
+
+  // Backfill and seed project_groups from existing services & defaults
+  try {
+    const existingDistinctGroups = await db.execute("SELECT DISTINCT group_name FROM services WHERE group_name IS NOT NULL");
+    const now = Date.now();
+    for (const row of existingDistinctGroups.rows as any[]) {
+      const gName = String(row.group_name || "").trim();
+      if (gName) {
+        const slug = "grp-" + gName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        await db.execute({
+          sql: "INSERT OR IGNORE INTO project_groups (id, name, environment, color, description, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+          args: [
+            slug,
+            gName,
+            gName.toLowerCase().includes("stag") ? "staging" : gName.toLowerCase().includes("dev") ? "development" : "production",
+            gName === "Production" ? "#10b981" : gName === "Campus Relay" ? "#06b6d4" : gName === "KrishiSetu" ? "#f59e0b" : "#8b5cf6",
+            `Project group for ${gName}`,
+            now,
+          ],
+        });
+      }
+    }
+
+    const defaults = [
+      { id: "grp-production", name: "Production", environment: "production", color: "#10b981", description: "Primary production cluster & live client APIs" },
+      { id: "grp-campus-relay", name: "Campus Relay", environment: "production", color: "#06b6d4", description: "Decentralized campus mesh and relay hubs" },
+      { id: "grp-krishisetu", name: "KrishiSetu", environment: "production", color: "#f59e0b", description: "AgriTech telemetric monitoring & sensor network" },
+      { id: "grp-internal-apis", name: "Internal APIs", environment: "development", color: "#8b5cf6", description: "Core backend microservices and worker daemons" },
+      { id: "grp-staging", name: "Staging", environment: "staging", color: "#ec4899", description: "Pre-release canary tests and QA pipelines" },
+    ];
+    for (const def of defaults) {
+      await db.execute({
+        sql: "INSERT OR IGNORE INTO project_groups (id, name, environment, color, description, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        args: [def.id, def.name, def.environment, def.color, def.description, now],
+      });
+    }
+  } catch {
+    // Ignore migration error
   }
 
   isInitialized = true;

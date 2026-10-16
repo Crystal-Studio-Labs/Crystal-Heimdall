@@ -44,6 +44,22 @@ export default function AddServiceModal({ isOpen, onClose, onCreated, onOpenSdk 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdTarget, setCreatedTarget] = useState<any>(null);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [availableGroups, setAvailableGroups] = useState<string[]>(["Production"]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch("/api/v1/groups")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data && data.groups && Array.isArray(data.groups)) {
+            const names = data.groups.map((g: any) => g.name);
+            if (!names.includes("Production")) names.unshift("Production");
+            setAvailableGroups(names);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen]);
 
   // Close on Escape key
   useEffect(() => {
@@ -301,7 +317,7 @@ export default function AddServiceModal({ isOpen, onClose, onCreated, onOpenSdk 
                 className="w-full p-2 bg-black border border-zinc-700 text-white font-mono text-xs focus:border-cyan-400 outline-none"
               />
               <div className="flex flex-wrap gap-1.5 pt-1.5">
-                {["Production", "Campus Relay", "KrishiSetu", "OSCC", "Internal APIs", "Staging"].map((tag) => (
+                {availableGroups.map((tag) => (
                   <button
                     type="button"
                     key={tag}

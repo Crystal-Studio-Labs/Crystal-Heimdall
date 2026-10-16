@@ -105,6 +105,7 @@ export default function DashboardPage() {
   const [filterType, setFilterType] = useState<"all" | "public" | "private" | "issues" | "maint">("all");
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [errorFilter, setErrorFilter] = useState<"unresolved" | "all" | "fatal" | "error">("unresolved");
+  const [customGroups, setCustomGroups] = useState<string[]>([]);
 
   // Pagination for services
   const [currentPage, setCurrentPage] = useState(1);
@@ -116,11 +117,19 @@ export default function DashboardPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [srvRes, incRes, errRes] = await Promise.all([
+      const [srvRes, incRes, errRes, grpRes] = await Promise.all([
         fetch("/api/v1/services"),
         fetch("/api/v1/incidents"),
         fetch("/api/v1/telemetry/errors"),
+        fetch("/api/v1/groups"),
       ]);
+
+      if (grpRes.ok) {
+        const grpData = await grpRes.json();
+        if (grpData && grpData.groups && Array.isArray(grpData.groups)) {
+          setCustomGroups(grpData.groups.map((g: any) => g.name));
+        }
+      }
 
       if (srvRes.ok) {
         const data = await srvRes.json();
@@ -394,8 +403,11 @@ export default function DashboardPage() {
 
   const activeIncidents = incidents.filter((i) => i.status !== "resolved");
 
-  // Unique project tags across services
-  const projectTags = Array.from(new Set(services.map((s) => s.group_name || "Production"))).filter(Boolean);
+  // Unique project tags across services and dynamic groups
+  const projectTags = Array.from(new Set([
+    ...customGroups,
+    ...services.map((s) => s.group_name || "Production")
+  ])).filter(Boolean);
 
   // Filtered services
   const filteredServices = services.filter((s) => {

@@ -44,6 +44,22 @@ export default function EditServiceModal({ isOpen, service, onClose, onUpdated }
   const [gracePeriodSec, setGracePeriodSec] = useState("300");
   const [isPublic, setIsPublic] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [availableGroups, setAvailableGroups] = useState<string[]>(COMMON_PROJECT_TAGS);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch("/api/v1/groups")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data && data.groups && Array.isArray(data.groups)) {
+            const names = data.groups.map((g: any) => g.name);
+            if (!names.includes("Production")) names.unshift("Production");
+            setAvailableGroups(names);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen]);
 
   // Prepopulate state when service opens
   useEffect(() => {
@@ -183,7 +199,7 @@ export default function EditServiceModal({ isOpen, service, onClose, onUpdated }
             </div>
             {/* Quick Suggestions */}
             <div className="flex flex-wrap gap-1.5 pt-1">
-              {COMMON_PROJECT_TAGS.map((tag) => (
+              {availableGroups.map((tag) => (
                 <button
                   type="button"
                   key={tag}
