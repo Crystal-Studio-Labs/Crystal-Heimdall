@@ -10,7 +10,10 @@ import {
   Server,
   ShieldCheck,
   Search,
-  Check
+  Check,
+  Copy,
+  CheckCircle2,
+  ArrowRight
 } from "lucide-react";
 import { useToast } from "../lib/ToastContext";
 
@@ -18,9 +21,10 @@ interface AddServiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreated: () => void;
+  onOpenSdk?: (service: any) => void;
 }
 
-export default function AddServiceModal({ isOpen, onClose, onCreated }: AddServiceModalProps) {
+export default function AddServiceModal({ isOpen, onClose, onCreated, onOpenSdk }: AddServiceModalProps) {
   const toast = useToast();
   const [name, setName] = useState("");
   const [type, setType] = useState<"http-poll" | "port-check" | "deadman-cron" | "webhook-sink">("http-poll");
@@ -35,15 +39,28 @@ export default function AddServiceModal({ isOpen, onClose, onCreated }: AddServi
   const [gracePeriodSec, setGracePeriodSec] = useState("300");
   const [isPublic, setIsPublic] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdTarget, setCreatedTarget] = useState<any>(null);
+  const [copiedKey, setCopiedKey] = useState(false);
 
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) onClose();
+      if (e.key === "Escape" && isOpen) {
+        setCreatedTarget(null);
+        onClose();
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
+
+  // Reset createdTarget on modal open/close
+  useEffect(() => {
+    if (!isOpen) {
+      setCreatedTarget(null);
+      setCopiedKey(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -82,18 +99,137 @@ export default function AddServiceModal({ isOpen, onClose, onCreated }: AddServi
         throw new Error(data.error || "Failed to create target");
       }
 
+      const data = await res.json();
       toast.success(`Target '${name.trim()}' registered successfully!`);
       setName("");
       setEndpoint("");
       setKeyword("");
       onCreated();
-      onClose();
+      setCreatedTarget(data.service);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // If newly created, present clear confirmation with optional SDK prompt
+  if (createdTarget) {
+    return (
+      <div 
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 font-mono text-xs overflow-y-auto"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setCreatedTarget(null);
+            onClose();
+          }
+        }}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="bg-[#0b0f17] border-2 border-emerald-500 shadow-[6px_6px_0px_#10b981] max-w-lg w-full p-6 sm:p-7 relative space-y-5 my-8">
+          <button
+            onClick={() => {
+              setCreatedTarget(null);
+              onClose();
+            }}
+            className="absolute top-5 right-5 p-1.5 bg-zinc-900 border border-zinc-700 text-zinc-400 hover:text-white"
+            aria-label="Close modal"
+          >
+            <X className="w-4 h-4" />
+          </button>
+
+          <div className="flex items-center space-x-3 border-b-2 border-zinc-800 pb-4">
+            <div className="w-9 h-9 bg-emerald-950 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 font-bold shrink-0">
+              <Check className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-black text-white uppercase tracking-tight">
+                Target Registered &amp; Active
+              </h2>
+              <p className="text-[11px] text-emerald-400 font-mono">
+                [SYNTHETIC MONITORING LIVE // ZERO CODE CHANGES REQUIRED]
+              </p>
+            </div>
+          </div>
+
+          <div className="p-3.5 bg-black border border-zinc-800 space-y-2">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-zinc-400 uppercase font-bold">TARGET:</span>
+              <span className="text-white font-black truncate max-w-[260px]">{createdTarget.name}</span>
+            </div>
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-zinc-400 uppercase font-bold">PROTOCOL:</span>
+              <span className="text-cyan-400 font-mono font-bold uppercase">{createdTarget.type}</span>
+            </div>
+            {createdTarget.endpoint && (
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-zinc-400 uppercase font-bold">ENDPOINT:</span>
+                <span className="text-zinc-300 font-mono truncate max-w-[260px]">{createdTarget.endpoint}</span>
+              </div>
+            )}
+            <div className="pt-2 border-t border-zinc-800 flex justify-between items-center">
+              <div>
+                <span className="text-[10px] text-zinc-400 block font-bold uppercase">TARGET API KEY:</span>
+                <code className="text-emerald-300 font-mono font-bold text-xs">{createdTarget.api_key}</code>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(createdTarget.api_key);
+                  setCopiedKey(true);
+                  toast.success("API key copied to clipboard!");
+                  setTimeout(() => setCopiedKey(false), 2000);
+                }}
+                className="px-2.5 py-1 bg-zinc-900 border border-zinc-700 hover:border-emerald-400 text-xs text-zinc-200 font-bold flex items-center gap-1"
+              >
+                {copiedKey ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-emerald-400" />}
+                <span>{copiedKey ? "COPIED" : "COPY"}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="p-3 bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-300 space-y-1">
+            <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              <span>Outbound synthetic probing is active right now.</span>
+            </p>
+            <p className="text-zinc-400 text-[10px] leading-relaxed">
+              Heimdall probes this target automatically. Connecting your external application code via our SDK is strictly <strong>optional</strong> — use it only if you want your backend server to report startup, push custom heartbeats, or notify Heimdall during graceful restarts.
+            </p>
+          </div>
+
+          <div className="pt-3 border-t-2 border-zinc-800 flex flex-col sm:flex-row items-center justify-end gap-2">
+            {onOpenSdk && (
+              <button
+                type="button"
+                onClick={() => {
+                  const target = createdTarget;
+                  setCreatedTarget(null);
+                  onClose();
+                  onOpenSdk(target);
+                }}
+                className="w-full sm:w-auto px-4 py-2 bg-purple-950/80 hover:bg-purple-900 border border-purple-500 text-purple-200 text-xs font-bold uppercase flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#000]"
+              >
+                <Radio className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+                <span>VIEW SDK SNIPPET (OPTIONAL)</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setCreatedTarget(null);
+                onClose();
+              }}
+              className="w-full sm:w-auto px-5 py-2 btn-primary text-xs font-black uppercase flex items-center justify-center gap-1.5"
+            >
+              <span>[ DONE // GO TO DASHBOARD ]</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -427,6 +563,17 @@ export default function AddServiceModal({ isOpen, onClose, onCreated }: AddServi
             >
               {isPublic ? "[PUBLIC]" : "[PRIVATE]"}
             </button>
+          </div>
+
+          {/* Note explaining that outbound monitoring is automatic and SDK connection is optional */}
+          <div className="p-2.5 bg-zinc-950 border border-zinc-800 text-[10px] text-zinc-400 flex items-start gap-2">
+            <Radio className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+            <div>
+              <strong className="text-zinc-200 uppercase">Outbound Probing Active:</strong>{" "}
+              <span>
+                Synthetic health polling starts automatically upon registration with zero code required. Connecting via drop-in SDK is strictly optional.
+              </span>
+            </div>
           </div>
 
           <div className="pt-3 border-t-2 border-zinc-800 flex justify-end space-x-2">

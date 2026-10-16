@@ -457,19 +457,6 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Connect App / SDK button */}
-            <button
-              onClick={() => {
-                setConnectService(null);
-                setIsConnectModalOpen(true);
-              }}
-              className="px-3.5 py-2 bg-purple-950/80 hover:bg-purple-900 border-2 border-purple-500 text-purple-200 text-xs font-bold uppercase flex items-center gap-2 shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
-              title="Connect external app via Two-Way Sync SDK snippet"
-            >
-              <Radio className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
-              <span>[ CONNECT APP / SDK ]</span>
-            </button>
-
             {/* Run Poll Cycle */}
             <button
               onClick={handleTriggerGlobalPoll}
@@ -1245,6 +1232,10 @@ export default function DashboardPage() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onCreated={loadData}
+        onOpenSdk={(service) => {
+          setConnectService(service);
+          setIsConnectModalOpen(true);
+        }}
       />
 
       <EditServiceModal

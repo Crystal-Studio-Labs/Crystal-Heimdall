@@ -338,10 +338,10 @@ app.get("/health/db", async (req, res) => {
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-black uppercase tracking-tight text-white flex items-center gap-2">
-                Two-Way Sentinel Sync &amp; SDK Generator
+                Two-Way Sentinel Sync &amp; SDK (Optional)
               </h2>
               <span className="text-[10px] text-zinc-400 block -mt-0.5">
-                Drop-in lifecycle sync: Startup, Heartbeats, Graceful Shutdowns &amp; Outbound Probing
+                Drop-in lifecycle sync: Startup, Heartbeats &amp; Graceful Shutdowns (Optional for monitored targets)
               </span>
             </div>
           </div>
@@ -351,6 +351,17 @@ app.get("/health/db", async (req, res) => {
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Global Optional SDK Reminder Banner */}
+        <div className="p-2.5 bg-zinc-950 border border-zinc-800 flex items-start gap-2.5 text-[11px] text-zinc-300">
+          <Radio className="w-4 h-4 text-purple-400 shrink-0 mt-0.5 animate-pulse" />
+          <div>
+            <span className="font-bold text-zinc-200 uppercase text-[10px]">Zero Code Required For Synthetic Health: </span>
+            <span className="text-zinc-400 text-[10px] leading-relaxed">
+              Heimdall monitors your endpoints automatically via outbound synthetic probes. Integrating this SDK into your application is 100% optional — use it if you want your backend server to report startup, send periodic heartbeats, or notify Heimdall during graceful restarts.
+            </span>
+          </div>
         </div>
 
         {step === "configure" ? (
