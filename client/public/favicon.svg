@@ -1,19 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- Deep Dark Obsidian Canvas -->
-  <rect width="64" height="64" fill="#070a0f"/>
+  <!-- PWA & Browser Circular Favicon (Transparent Background) -->
+  <!-- Outer Emerald Ring -->
+  <circle cx="32" cy="32" r="29" fill="#070a0f" stroke="#10b981" stroke-width="3"/>
+  <!-- Inner Dark Obsidian Core -->
+  <circle cx="32" cy="32" r="24" fill="#18181b" stroke="#059669" stroke-width="1.2"/>
   
-  <!-- Hard Drop Shadow (Brutalist shadow-[2px_2px_0px_#000]) -->
-  <rect x="10" y="10" width="48" height="48" fill="#000000"/>
-  
-  <!-- Badge Box (bg-zinc-900 border-2 border-emerald-400) -->
-  <rect x="6" y="6" width="48" height="48" fill="#18181b" stroke="#10b981" stroke-width="3"/>
-  
-  <!-- Lucide Activity Heartbeat Telemetry Pulse (emerald-400 #34d399) -->
-  <g transform="translate(14, 14) scale(1.33333)">
-    <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" 
+  <!-- Centered Lucide Activity Heartbeat Telemetry Pulse (emerald-400 #34d399) -->
+  <g transform="translate(14, 14) scale(1.5)">
+    <path d="M 2 12 L 6 12 L 9 3 L 15 21 L 18 12 L 22 12" 
           fill="none" 
           stroke="#34d399" 
-          stroke-width="2.6" 
+          stroke-width="2.5" 
           stroke-linecap="round" 
           stroke-linejoin="round"/>
   </g>

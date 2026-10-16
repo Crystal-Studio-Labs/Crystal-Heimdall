@@ -2,20 +2,20 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="alternate icon" type="image/png" href="/icon-192.png" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=5" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=5" />
+    <link rel="alternate icon" type="image/png" href="/icon-192.png?v=5" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
     <title>Crystal Heimdall</title>
     
     <!-- PWA Web Manifest & App Meta -->
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="manifest" href="/manifest.webmanifest?v=5" />
     <meta name="theme-color" content="#070a0f" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Crystal Heimdall" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <meta name="msapplication-TileImage" content="/icon-512.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=5" />
+    <meta name="msapplication-TileImage" content="/icon-512.png?v=5" />
     <meta name="msapplication-TileColor" content="#070a0f" />
 
     <!-- Search Engine & Social Media Open Graph Fallbacks (Non-JS crawlers) -->
@@ -45,7 +45,10 @@
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').then(
-            (reg) => console.log('[PWA] ServiceWorker registered with scope:', reg.scope),
+            (reg) => {
+              console.log('[PWA] ServiceWorker registered with scope:', reg.scope);
+              reg.update();
+            },
             (err) => console.log('[PWA] ServiceWorker registration failed:', err)
           );
         });

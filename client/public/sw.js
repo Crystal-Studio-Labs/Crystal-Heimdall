@@ -1,11 +1,18 @@
-// Uptime Tracker Sentinel Service Worker
-const CACHE_NAME = "crystal-uptime-v3";
+// Crystal Heimdall Sentinel Service Worker (v5 Circle Icons)
+const CACHE_NAME = "crystal-uptime-v5-circle-icons";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
   "/manifest.webmanifest",
+  "/favicon.svg",
+  "/favicon.ico",
+  "/icon-192.png",
   "/icon-192.svg",
-  "/icon-512.svg"
+  "/icon-192-maskable.png",
+  "/icon-512.png",
+  "/icon-512.svg",
+  "/icon-512-maskable.png",
+  "/apple-touch-icon.png"
 ];
 
 self.addEventListener("install", (event) => {

@@ -1,22 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
-  <!-- Deep Dark Obsidian Canvas -->
-  <rect width="192" height="192" fill="#070a0f"/>
+  <!-- PWA App Logo (Circular Emblem, Transparent Background) -->
+  <!-- Outer Dark Obsidian Base & Vivid Emerald Ring -->
+  <circle cx="96" cy="96" r="88" fill="#070a0f" stroke="#10b981" stroke-width="8"/>
+  <circle cx="96" cy="96" r="76" fill="#18181b" stroke="#059669" stroke-width="3"/>
   
-  <!-- Hard Drop Shadow (Brutalist shadow-[4px_4px_0px_#000]) -->
-  <rect x="30" y="30" width="144" height="144" fill="#000000"/>
-  
-  <!-- Badge Box (bg-zinc-900 border-2 border-emerald-400) -->
-  <rect x="18" y="18" width="144" height="144" fill="#18181b" stroke="#10b981" stroke-width="8"/>
-  
-  <!-- Corner Sentinel Accents -->
-  <path d="M 26 38 L 26 26 L 38 26" stroke="#34d399" stroke-width="3" fill="none"/>
-  <path d="M 154 38 L 154 26 L 142 26" stroke="#34d399" stroke-width="3" fill="none"/>
-  <path d="M 26 142 L 26 154 L 38 154" stroke="#34d399" stroke-width="3" fill="none"/>
-  <path d="M 154 142 L 154 154 L 142 154" stroke="#34d399" stroke-width="3" fill="none"/>
+  <!-- Subtle Radar Crosshair Ring -->
+  <circle cx="96" cy="96" r="60" fill="none" stroke="#064e3b" stroke-width="1.5" stroke-dasharray="4,6"/>
 
-  <!-- Lucide Activity Heartbeat Telemetry Pulse (emerald-400 #34d399) -->
-  <g transform="translate(42, 42) scale(4.0)">
-    <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" 
+  <!-- Centered Lucide Activity Heartbeat Telemetry Pulse (emerald-400 #34d399) -->
+  <g transform="translate(42, 42) scale(4.5)">
+    <path d="M 2 12 L 6 12 L 9 3 L 15 21 L 18 12 L 22 12" 
           fill="none" 
           stroke="#34d399" 
           stroke-width="2.5" 
