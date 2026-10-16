@@ -1,22 +1,38 @@
-import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { 
   ShieldCheck, 
   ArrowLeft, 
   AlertCircle,
-  Lock
+  Lock,
+  LayoutDashboard,
+  LogOut,
+  CheckCircle2
 } from "lucide-react";
-import { setAuthToken } from "../lib/api";
+import { setAuthToken, getSessionInfo, clearAuthToken } from "../lib/api";
 import { useToast } from "../lib/ToastContext";
 import SEO from "../components/SEO";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   
+  const searchParams = new URLSearchParams(location.search);
+  const isExplicitReauth = searchParams.get("reauth") === "true" || searchParams.get("switch") === "true";
+  
+  const [session, setSession] = useState(() => getSessionInfo());
   const [totpCode, setTotpCode] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Auto-redirect to dashboard if operator already has an active, valid session (at least 7 days)
+  useEffect(() => {
+    if (session.isValid && !isExplicitReauth) {
+      toast.info("Active operator session detected • Returning to Command Deck");
+      navigate("/dashboard", { replace: true });
+    }
+  }, [session.isValid, isExplicitReauth, navigate, toast]);
 
   // Submit 6-digit TOTP code directly (2FA Enforced)
   const handleSubmit2Fa = async (e: React.FormEvent) => {
@@ -37,7 +53,7 @@ export default function LoginPage() {
       if (!res.ok) throw new Error(data.error || "2FA verification failed");
 
       setAuthToken(data.token);
-      toast.success("2FA code verified • Operator session authorized!");
+      toast.success("2FA verified • 7+ Day Operator session authorized!");
       navigate("/dashboard");
     } catch (err: any) {
       setErrorMessage(err.message);
@@ -45,6 +61,13 @@ export default function LoginPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSwitchOperator = () => {
+    clearAuthToken();
+    setSession(getSessionInfo());
+    setTotpCode("");
+    toast.info("Previous session cleared. Enter 2FA code to authenticate.");
   };
 
   return (
@@ -91,6 +114,42 @@ export default function LoginPage() {
             <div className="p-3.5 bg-rose-950/60 border-2 border-rose-600 text-rose-300 text-xs font-mono flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
               <span className="leading-snug">{errorMessage}</span>
+            </div>
+          )}
+
+          {/* Active Session Notice Banner if session is currently valid */}
+          {session.isValid && (
+            <div className="p-4 bg-emerald-950/50 border-2 border-emerald-500 text-emerald-300 space-y-3 font-mono shadow-[2px_2px_0px_#000]">
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="flex items-center gap-1.5 text-emerald-400">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  [ ACTIVE OPERATOR SESSION ]
+                </span>
+                <span className="text-[10px] bg-emerald-900/80 px-2 py-0.5 border border-emerald-400">
+                  ~{session.daysRemaining}d VALID
+                </span>
+              </div>
+              <p className="text-xs text-zinc-300 font-sans">
+                You are currently authenticated as <strong>{session.operator}</strong>. Your session is remembered and remains valid for at least 7 days.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => navigate("/dashboard")}
+                  className="flex-1 py-2.5 bg-emerald-400 hover:bg-emerald-300 text-black font-bold text-xs uppercase flex items-center justify-center gap-2 shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                >
+                  <LayoutDashboard className="w-3.5 h-3.5" />
+                  <span>[ RETURN TO COMMAND DECK ]</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSwitchOperator}
+                  className="px-3 py-2.5 bg-zinc-900 hover:bg-rose-950 border border-zinc-700 hover:border-rose-600 text-zinc-400 hover:text-rose-300 font-bold text-xs uppercase flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#000]"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>SWITCH OPERATOR</span>
+                </button>
+              </div>
             </div>
           )}
 

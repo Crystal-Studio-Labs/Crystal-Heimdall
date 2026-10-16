@@ -80,7 +80,7 @@ router.post("/login", async (req: Request, res: Response) => {
       args: [],
     });
 
-    // Issue session JWT (valid for 30 days)
+    // Issue session JWT (valid for 30 days — minimum 7 days guaranteed)
     const sessionToken = jwt.sign({ operator: "Operator", authenticated: true }, JWT_SECRET, {
       expiresIn: "30d",
     });
@@ -89,7 +89,9 @@ router.post("/login", async (req: Request, res: Response) => {
       success: true,
       token: sessionToken,
       operator: "Operator",
-      message: "2FA Verified. Operator session authorized.",
+      expiresInDays: 30,
+      sessionExpiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+      message: "2FA Verified. Operator session authorized for 30 days.",
       isLocked: true,
     });
   } catch (err: any) {
@@ -130,6 +132,9 @@ router.post("/verify-2fa", async (req: Request, res: Response) => {
       success: true,
       token: sessionToken,
       operator: "Operator",
+      expiresInDays: 30,
+      sessionExpiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+      message: "2FA Verified. Operator session authorized for 30 days.",
       isLocked: true,
     });
   } catch (err: any) {
@@ -188,7 +193,15 @@ router.get("/me", (req: Request, res: Response) => {
   const token = authHeader.replace(/^Bearer\s+/i, "");
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
-    return res.json({ authenticated: true, operator: decoded.operator });
+    const expiresAt = decoded.exp ? decoded.exp * 1000 : Date.now() + 30 * 24 * 60 * 60 * 1000;
+    const daysRemaining = decoded.exp ? Math.max(0, Math.ceil((decoded.exp * 1000 - Date.now()) / (1000 * 60 * 60 * 24))) : 30;
+    return res.json({ 
+      authenticated: true, 
+      operator: decoded.operator || "Operator",
+      exp: decoded.exp,
+      expiresAt: new Date(expiresAt).toISOString(),
+      daysRemaining
+    });
   } catch {
     return res.status(401).json({ authenticated: false });
   }
