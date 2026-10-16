@@ -14,9 +14,20 @@ import {
   Activity,
   Terminal,
   Layers,
-  Share2
+  Share2,
+  Send,
+  Plus
 } from "lucide-react";
 import { useToast } from "../lib/ToastContext";
+import { isOperatorAuthenticated } from "../lib/api";
+
+export interface IncidentTimelineUpdate {
+  id: string;
+  incident_id: string;
+  status: "investigating" | "identified" | "monitoring" | "resolved";
+  message: string;
+  created_at: number;
+}
 
 interface IncidentDetail {
   id: string;
@@ -28,10 +39,13 @@ interface IncidentDetail {
   message: string;
   severity: "critical" | "warning" | "info";
   status: "active" | "acknowledged" | "resolved";
-  count: number;
-  created_at: number;
-  last_seen_at: number;
+  occurrences_count?: number;
+  count?: number;
+  first_seen_at?: number;
+  created_at?: number;
+  last_seen_at?: number;
   resolved_at?: number | null;
+  updates?: IncidentTimelineUpdate[];
 }
 
 export default function IncidentDetailPage() {
@@ -40,6 +54,12 @@ export default function IncidentDetailPage() {
   const [incident, setIncident] = useState<IncidentDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Authenticated operator composer state
+  const [isAuthenticated] = useState(() => isOperatorAuthenticated());
+  const [postStatus, setPostStatus] = useState<"investigating" | "identified" | "monitoring" | "resolved">("investigating");
+  const [postMessage, setPostMessage] = useState("");
+  const [isPosting, setIsPosting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -67,9 +87,70 @@ export default function IncidentDetailPage() {
     }
   };
 
+  const handleAppendUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!postMessage.trim() || !id) {
+      toast.warning("Please enter an update message");
+      return;
+    }
+
+    setIsPosting(true);
+    try {
+      const res = await fetch(`/api/v1/incidents/${id}/updates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: postStatus,
+          message: postMessage.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to post update");
+      }
+
+      const json = await res.json();
+      setIncident((prev) => {
+        if (!prev) return null;
+        const currentUpdates = prev.updates || [];
+        return {
+          ...prev,
+          status: json.incident_status || prev.status,
+          resolved_at: postStatus === "resolved" ? Date.now() : prev.resolved_at,
+          updates: [...currentUpdates, json.update],
+        };
+      });
+
+      setPostMessage("");
+      toast.success(`Timeline update recorded: [${postStatus.toUpperCase()}]`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to append update");
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
   const isResolved = incident?.status === "resolved";
-  const durationMs = incident ? (incident.resolved_at || incident.last_seen_at) - incident.created_at : 0;
+  const startedAt = incident?.first_seen_at || incident?.created_at || Date.now();
+  const lastSeen = incident?.last_seen_at || startedAt;
+  const durationMs = incident ? (incident.resolved_at || lastSeen) - startedAt : 0;
   const durationMin = Math.max(1, Math.round(durationMs / 60000));
+  const eventCount = incident?.occurrences_count || incident?.count || 1;
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case "resolved":
+        return "bg-emerald-950 text-emerald-300 border-emerald-500";
+      case "monitoring":
+        return "bg-sky-950 text-sky-300 border-sky-500";
+      case "identified":
+        return "bg-amber-950 text-amber-300 border-amber-500";
+      case "investigating":
+      default:
+        return "bg-rose-950 text-rose-300 border-rose-500";
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#070a0f] text-zinc-100 flex flex-col font-mono relative overflow-hidden pb-24">
@@ -158,8 +239,8 @@ export default function IncidentDetailPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
                 <div className="p-3 bg-black border border-zinc-800 space-y-1">
                   <span className="text-[10px] text-zinc-500 block">STARTED AT</span>
-                  <span className="text-xs text-white font-bold">{new Date(incident.created_at).toLocaleTimeString()}</span>
-                  <span className="text-[9px] text-zinc-500 block">{new Date(incident.created_at).toLocaleDateString()}</span>
+                  <span className="text-xs text-white font-bold">{new Date(startedAt).toLocaleTimeString()}</span>
+                  <span className="text-[9px] text-zinc-500 block">{new Date(startedAt).toLocaleDateString()}</span>
                 </div>
 
                 <div className="p-3 bg-black border border-zinc-800 space-y-1">
@@ -180,72 +261,135 @@ export default function IncidentDetailPage() {
 
                 <div className="p-3 bg-black border border-zinc-800 space-y-1">
                   <span className="text-[10px] text-zinc-500 block">OCCURRENCES</span>
-                  <span className="text-xs text-white font-bold">× {incident.count}</span>
+                  <span className="text-xs text-white font-bold">× {eventCount}</span>
                   <span className="text-[9px] text-zinc-500 block">Deduplicated</span>
                 </div>
               </div>
             </div>
 
-            {/* TIMELINE OF EVENTS (CHRONOLOGICAL INVESTIGATION TRAIL) */}
+            {/* TIMELINE OF EVENTS (AUTHENTIC DATABASE LEDGER) */}
             <div className="p-6 sm:p-8 bg-[#0b0f17] border-2 border-zinc-800 shadow-[4px_4px_0px_#000] space-y-6">
-              <div className="flex items-center space-x-2 text-xs font-bold text-cyan-400 border-b border-zinc-800 pb-3 uppercase">
-                <Clock className="w-4 h-4" />
-                <span>[INCIDENT LIFECYCLE & RESOLUTION TIMELINE]</span>
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <div className="flex items-center space-x-2 text-xs font-bold text-cyan-400 uppercase">
+                  <Clock className="w-4 h-4" />
+                  <span>[INCIDENT LIFECYCLE & RESOLUTION TIMELINE]</span>
+                </div>
+                <span className="text-[11px] text-zinc-500 font-bold">
+                  {incident.updates?.length || 1} CHRONOLOGICAL ENTRIES
+                </span>
               </div>
 
               <div className="relative pl-6 space-y-8 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-zinc-800">
-                {/* Step 1: Disruption Detected */}
-                <div className="relative space-y-1">
-                  <span className="absolute -left-6 top-1 w-3 h-3 bg-rose-500 border-2 border-black" />
-                  <div className="flex items-center gap-2 text-xs font-bold text-rose-400 uppercase">
-                    <span>1. SYSTEM DISRUPTION DETECTED</span>
-                    <span className="text-zinc-600">•</span>
-                    <span className="text-zinc-500 text-[11px]">{new Date(incident.created_at).toLocaleString()}</span>
-                  </div>
-                  <p className="text-xs text-zinc-300 font-sans leading-relaxed pt-1">
-                    Continuous synthetic health probe recorded threshold violation. Outage alert dispatched to designated operator relays.
-                  </p>
-                </div>
+                {incident.updates && incident.updates.length > 0 ? (
+                  incident.updates.map((upd, idx) => {
+                    const isResolvedStep = upd.status === "resolved";
+                    const isMonitoringStep = upd.status === "monitoring";
+                    const isIdentifiedStep = upd.status === "identified";
+                    const dotColor = isResolvedStep
+                      ? "bg-emerald-400"
+                      : isMonitoringStep
+                      ? "bg-sky-400"
+                      : isIdentifiedStep
+                      ? "bg-amber-400"
+                      : "bg-rose-500";
 
-                {/* Step 2: Investigation & Triage */}
-                <div className="relative space-y-1">
-                  <span className="absolute -left-6 top-1 w-3 h-3 bg-amber-400 border-2 border-black" />
-                  <div className="flex items-center gap-2 text-xs font-bold text-amber-300 uppercase">
-                    <span>2. INVESTIGATION & MITIGATION</span>
-                    <span className="text-zinc-600">•</span>
-                    <span className="text-zinc-500 text-[11px]">
-                      {new Date(incident.created_at + Math.min(300000, durationMs / 2)).toLocaleTimeString()}
-                    </span>
-                  </div>
-                  <p className="text-xs text-zinc-300 font-sans leading-relaxed pt-1">
-                    Telemetry deduplication suppressed storm triggers. Operator confirmed synthetic latency spike and failover routing was initiated.
-                  </p>
-                </div>
+                    const textColor = isResolvedStep
+                      ? "text-emerald-400"
+                      : isMonitoringStep
+                      ? "text-sky-400"
+                      : isIdentifiedStep
+                      ? "text-amber-300"
+                      : "text-rose-400";
 
-                {/* Step 3: Resolution */}
-                <div className="relative space-y-1">
-                  <span className={`absolute -left-6 top-1 w-3 h-3 border-2 border-black ${
-                    isResolved ? "bg-emerald-400" : "bg-zinc-700"
-                  }`} />
-                  <div className={`flex items-center gap-2 text-xs font-bold uppercase ${
-                    isResolved ? "text-emerald-400" : "text-zinc-500"
-                  }`}>
-                    <span>3. {isResolved ? "SERVICE RESOLVED & RESTORED" : "RESOLUTION IN PROGRESS"}</span>
-                    {incident.resolved_at && (
-                      <>
-                        <span className="text-zinc-600">•</span>
-                        <span className="text-zinc-500 text-[11px]">{new Date(incident.resolved_at).toLocaleString()}</span>
-                      </>
-                    )}
+                    return (
+                      <div key={upd.id || idx} className="relative space-y-1">
+                        <span className={`absolute -left-6 top-1 w-3 h-3 ${dotColor} border-2 border-black`} />
+                        <div className="flex items-center gap-2 text-xs font-bold uppercase">
+                          <span className={textColor}>
+                            {idx + 1}. [{upd.status.toUpperCase()}]
+                          </span>
+                          <span className="text-zinc-600">•</span>
+                          <span className="text-zinc-500 text-[11px]">
+                            {new Date(upd.created_at).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-xs text-zinc-300 font-sans leading-relaxed pt-1">
+                          {upd.message}
+                        </p>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="relative space-y-1">
+                    <span className="absolute -left-6 top-1 w-3 h-3 bg-rose-500 border-2 border-black" />
+                    <div className="flex items-center gap-2 text-xs font-bold text-rose-400 uppercase">
+                      <span>1. [INVESTIGATING] INITIAL SYSTEM DISRUPTION DETECTED</span>
+                      <span className="text-zinc-600">•</span>
+                      <span className="text-zinc-500 text-[11px]">{new Date(startedAt).toLocaleString()}</span>
+                    </div>
+                    <p className="text-xs text-zinc-300 font-sans leading-relaxed pt-1">
+                      {incident.message || "Automated telemetry probe recorded threshold violation. Outage logged to sentinel ledger."}
+                    </p>
                   </div>
-                  <p className="text-xs text-zinc-300 font-sans leading-relaxed pt-1">
-                    {isResolved
-                      ? "Successive probe checks verified 200 OK responses. Latency stabilized within nominal SLA parameters. Incident closed."
-                      : "Engine poller continues tracking probe responses. Waiting for 3 consecutive nominal checks."}
-                  </p>
-                </div>
+                )}
               </div>
             </div>
+
+            {/* OPERATOR TIMELINE NOTE COMPOSER (WHEN OPERATOR IS LOGGED IN) */}
+            {isAuthenticated && (
+              <div className="p-6 bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] space-y-4">
+                <div className="flex items-center space-x-2 text-xs font-bold text-cyan-400 uppercase border-b border-zinc-800 pb-2">
+                  <Plus className="w-4 h-4" />
+                  <span>// OPERATOR COMMAND // APPEND POSTMORTEM TIMELINE UPDATE</span>
+                </div>
+
+                <form onSubmit={handleAppendUpdate} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-zinc-400 uppercase font-bold block">
+                      INCIDENT PROGRESSION STAGE
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {(["investigating", "identified", "monitoring", "resolved"] as const).map((st) => (
+                        <button
+                          type="button"
+                          key={st}
+                          onClick={() => setPostStatus(st)}
+                          className={`py-2 text-xs font-bold uppercase border transition ${
+                            postStatus === st
+                              ? getStatusBadgeClass(st)
+                              : "bg-black border-zinc-800 text-zinc-500 hover:text-zinc-300"
+                          }`}
+                        >
+                          [{st.toUpperCase()}]
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-zinc-400 uppercase font-bold block">
+                      OPERATOR POSTMORTEM NOTE / MITIGATION ACTION
+                    </label>
+                    <textarea
+                      value={postMessage}
+                      onChange={(e) => setPostMessage(e.target.value)}
+                      placeholder="e.g. Applied cache connection pool patch. Error rate dropped below 0.1% across all ingress endpoints."
+                      rows={3}
+                      className="w-full bg-black border border-zinc-700 text-white p-3 text-xs focus:border-cyan-500 focus:outline-none resize-none font-sans"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isPosting || !postMessage.trim()}
+                    className="w-full sm:w-auto px-6 py-2.5 bg-cyan-950 border border-cyan-500 text-cyan-300 hover:bg-cyan-900 disabled:opacity-40 font-bold uppercase text-xs flex items-center justify-center gap-2 transition"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{isPosting ? "[ RECORDING TO AUDIT LEDGER... ]" : "[ APPEND TO AUDIT LEDGER ]"}</span>
+                  </button>
+                </form>
+              </div>
+            )}
 
             {/* RAW TELEMETRY LOGS */}
             <div className="p-6 bg-[#0b0f17] border-2 border-zinc-800 shadow-[4px_4px_0px_#000] space-y-3">
@@ -260,10 +404,11 @@ export default function IncidentDetailPage() {
   target_service_name: incident.service_name,
   severity_level: incident.severity,
   triaged_status: incident.status,
-  deduplicated_count: incident.count,
-  timestamp_start: incident.created_at,
+  deduplicated_count: eventCount,
+  timestamp_start: startedAt,
   timestamp_resolved: incident.resolved_at || null,
   outage_duration_minutes: durationMin,
+  timeline_updates_count: incident.updates?.length || 0,
   diagnostic_message: incident.message
 }, null, 2)}
               </pre>
