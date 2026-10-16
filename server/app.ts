@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { initDb, getDb } from "./db.js";
 import { runPollCycle } from "./poller.js";
+import { createRateLimiter } from "./rateLimiter.js";
 
 // Load environment variables
 dotenv.config();
@@ -13,9 +14,37 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
+// Disable information disclosure headers
+app.disable("x-powered-by");
+
+// Security Headers & Defense In Depth Middleware
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  next();
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Global API Rate Limiter (300 req/min per IP) to mitigate denial of service & scraping
+const globalApiLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 300,
+  message: "Global API rate limit exceeded. Please throttle request frequency.",
+});
+app.use("/api/", globalApiLimiter);
+
+// Heartbeat Ping Rate Limiter (120 req/min)
+const pingRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: "Sentinel heartbeat rate limit reached. Max 120 ping signals per minute.",
+});
 
 // Ensure database tables exist (Cold-start safety for serverless)
 app.use(async (_req, _res, next) => {
@@ -65,7 +94,7 @@ app.use("/api/v1/channels", channelsRoutes);
 app.use("/api/v1/telemetry", telemetryRoutes);
 
 // Two-Way Sentinel Lifecycle Sync & Dead-Man's Switch ping check-in
-app.all("/api/v1/ping/:key", async (req, res) => {
+app.all("/api/v1/ping/:key", pingRateLimiter, async (req, res) => {
   try {
     const { key } = req.params;
     const db = getDb();

@@ -1,11 +1,38 @@
 import { Router, Request, Response } from "express";
 import { getDb, initDb } from "../db.js";
+import { createRateLimiter } from "../rateLimiter.js";
 
 const router = Router();
 
+// In-memory status cache: 10-second TTL prevents database exhaustion and rate-limiting
+interface CachedStatus {
+  data: any;
+  cachedAt: number;
+}
+let statusCache: CachedStatus | null = null;
+const STATUS_CACHE_TTL_MS = 10000;
+
+export function invalidateStatusCache() {
+  statusCache = null;
+}
+
+// Rate Limiter: Max 60 requests per minute per IP for public status queries
+const statusRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: "Status page query rate limit reached. Telemetry is automatically cached and refreshed.",
+});
+
 // GET public status data (Only services where is_public = 1)
-router.get("/", async (_req: Request, res: Response) => {
+router.get("/", statusRateLimiter, async (_req: Request, res: Response) => {
   try {
+    const now = Date.now();
+    if (statusCache && now - statusCache.cachedAt < STATUS_CACHE_TTL_MS) {
+      res.setHeader("X-Cache", "HIT");
+      res.setHeader("X-Cache-TTL", Math.round((STATUS_CACHE_TTL_MS - (now - statusCache.cachedAt)) / 1000));
+      return res.json(statusCache.data);
+    }
+
     await initDb();
     const db = getDb();
 
@@ -149,14 +176,17 @@ router.get("/", async (_req: Request, res: Response) => {
       }
     }
 
-    return res.json({
+    const payload = {
       overallStatus,
       avgUptime: Number(avgUptime.toFixed(2)),
       lastUpdated: new Date().toISOString(),
       services: enhancedServices,
       recentIncidents: incidents,
       settings,
-    });
+    };
+    statusCache = { data: payload, cachedAt: now };
+    res.setHeader("X-Cache", "MISS");
+    return res.json(payload);
   } catch (err: any) {
     return res.status(500).json({ error: "Failed to load public status", details: err.message });
   }

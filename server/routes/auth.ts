@@ -3,9 +3,17 @@ import jwt from "jsonwebtoken";
 import { authenticator } from "otplib";
 import qrcode from "qrcode";
 import { getDb, initDb } from "../db.js";
+import { createRateLimiter } from "../rateLimiter.js";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "crystal_heimdall_super_secret_jwt_key_2026";
+
+// Rate Limiter: Max 5 attempts per minute per IP to prevent TOTP brute forcing
+const authRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: "Too many authentication attempts. Please wait 60 seconds before trying again.",
+});
 
 // Allow ±1 time-step window (±30s) to handle mobile device clock skew & network latency
 authenticator.options = { window: 1 };
@@ -55,7 +63,7 @@ router.get("/status", async (_req: Request, res: Response) => {
 });
 
 // 1. Direct 2FA-Only Login (Zero master passcode, Zero OAuth)
-router.post("/login", async (req: Request, res: Response) => {
+router.post("/login", authRateLimiter, async (req: Request, res: Response) => {
   try {
     await initDb();
     const { code, totpCode } = req.body;
@@ -100,7 +108,7 @@ router.post("/login", async (req: Request, res: Response) => {
 });
 
 // 2. Direct verify-2fa endpoint
-router.post("/verify-2fa", async (req: Request, res: Response) => {
+router.post("/verify-2fa", authRateLimiter, async (req: Request, res: Response) => {
   try {
     await initDb();
     const { code, totpCode } = req.body;
