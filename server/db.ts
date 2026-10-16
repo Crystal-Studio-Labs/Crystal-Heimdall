@@ -10,13 +10,23 @@ let isInitialized = false;
 
 export function getDb(): Client {
   if (!clientInstance) {
-    const tursoUrl = process.env.TURSO_DATABASE_URL;
-    const tursoToken = process.env.TURSO_AUTH_TOKEN;
+    const rawUrl =
+      process.env.TURSO_DATABASE_URL ||
+      process.env.TURSO_DB_URL ||
+      process.env.LIBSQL_URL ||
+      process.env.DATABASE_URL;
+    const rawToken =
+      process.env.TURSO_AUTH_TOKEN ||
+      process.env.TURSO_TOKEN ||
+      process.env.LIBSQL_AUTH_TOKEN;
+
+    const tursoUrl = rawUrl?.trim().replace(/^["']|["']$/g, "");
+    const tursoToken = rawToken?.trim().replace(/^["']|["']$/g, "");
 
     if (tursoUrl) {
       clientInstance = createClient({
         url: tursoUrl,
-        authToken: tursoToken,
+        authToken: tursoToken || undefined,
       });
     } else {
       const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);

@@ -51,30 +51,41 @@ function renderSvgBadge(
 // Helper to handle project group badge generation
 async function handleProjectGroupBadge(groupParam: string, req: Request, res: Response) {
   const db = getDb();
-  const group = decodeURIComponent(groupParam).trim();
+  let group = decodeURIComponent(groupParam).trim();
+  group = group.replace(/\.svg$/i, "").replace(/\/status$/i, "").trim();
   const metric = (req.query.metric as string) || "status";
   const customLabel = req.query.label as string | undefined;
   const redirectUrl = (req.query.link as string) || DEFAULT_REDIRECT_URL;
 
+  // Resolve canonical group name if passed by ID or case-mismatched name
+  const grpCheck = await db.execute({
+    sql: "SELECT id, name FROM project_groups WHERE LOWER(name) = LOWER(?) OR id = ? LIMIT 1",
+    args: [group, group],
+  });
+  const canonicalName = grpCheck.rows.length > 0 ? (grpCheck.rows[0].name as string) : group;
+
   // Find all public services in this project group
   const svcRes = await db.execute({
-    sql: "SELECT status, uptime_pct, latency_ms FROM services WHERE LOWER(group_name) = LOWER(?) AND is_public = 1",
-    args: [group],
+    sql: `SELECT status, uptime_pct, latency_ms FROM services 
+          WHERE (LOWER(group_name) = LOWER(?) OR LOWER(group_name) = LOWER(?)) 
+          AND (is_public = 1 OR is_public IS NULL)`,
+    args: [group, canonicalName],
   });
 
   const services = svcRes.rows as any[];
-  const label = customLabel || group.toUpperCase();
+  const label = customLabel || canonicalName.toUpperCase();
 
-  // If no services tagged with this group, verify if group exists in project_groups
+  // If no services tagged with this group, verify if group exists in project_groups or services
   if (services.length === 0) {
-    const grpCheck = await db.execute({
-      sql: "SELECT name FROM project_groups WHERE LOWER(name) = LOWER(?) LIMIT 1",
-      args: [group],
-    });
-
     if (grpCheck.rows.length === 0) {
-      const svg = renderSvgBadge(label, "PROJECT NOT FOUND", "#71717a", redirectUrl);
-      return res.send(svg);
+      const anySvc = await db.execute({
+        sql: "SELECT count(*) as count FROM services WHERE LOWER(group_name) = LOWER(?) OR LOWER(group_name) = LOWER(?)",
+        args: [group, canonicalName],
+      });
+      if (Number(anySvc.rows[0]?.count || 0) === 0) {
+        const svg = renderSvgBadge(label, "PROJECT NOT FOUND", "#71717a", redirectUrl);
+        return res.send(svg);
+      }
     }
 
     if (metric === "uptime") {
@@ -125,21 +136,27 @@ async function handleProjectGroupBadge(groupParam: string, req: Request, res: Re
 // Helper to handle individual service badge generation
 async function handleServiceBadge(serviceIdOrName: string, req: Request, res: Response) {
   const db = getDb();
+  let target = decodeURIComponent(serviceIdOrName).trim();
+  target = target.replace(/\.svg$/i, "").replace(/\/status$/i, "").trim();
   const metric = (req.query.metric as string) || "status";
   const customLabel = req.query.label as string | undefined;
-  const redirectUrl = (req.query.link as string) || DEFAULT_REDIRECT_URL;
 
   const svcRes = await db.execute({
     sql: "SELECT * FROM services WHERE id = ? OR LOWER(name) = LOWER(?) LIMIT 1",
-    args: [serviceIdOrName, serviceIdOrName],
+    args: [target, target],
   });
 
-  if (svcRes.rows.length === 0) {
+  const service = (svcRes.rows.length > 0 ? svcRes.rows[0] : null) as any;
+  const defaultServiceRedirect = service
+    ? `${DEFAULT_REDIRECT_URL.replace(/\/$/, "")}/service/${service.id}`
+    : DEFAULT_REDIRECT_URL;
+  const redirectUrl = (req.query.link as string) || defaultServiceRedirect;
+
+  if (!service) {
     const svg = renderSvgBadge(customLabel || "heimdall", "TARGET NOT FOUND", "#71717a", redirectUrl);
     return res.send(svg);
   }
 
-  const service = svcRes.rows[0] as any;
   const label = customLabel || service.name;
 
   if (metric === "uptime") {
@@ -174,7 +191,7 @@ async function handleServiceBadge(serviceIdOrName: string, req: Request, res: Re
 }
 
 // GET dynamic SVG status badge for a specific project/environment group
-router.get("/project/:group/status.svg", async (req: Request, res: Response) => {
+router.get(["/project/:group/status.svg", "/project/:group.svg", "/project/:group"], async (req: Request, res: Response) => {
   try {
     await initDb();
     res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
@@ -189,7 +206,7 @@ router.get("/project/:group/status.svg", async (req: Request, res: Response) => 
 });
 
 // GET dynamic SVG status badge for an individual service
-router.get("/service/:id/status.svg", async (req: Request, res: Response) => {
+router.get(["/service/:id/status.svg", "/service/:id.svg", "/service/:id"], async (req: Request, res: Response) => {
   try {
     await initDb();
     res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
@@ -204,11 +221,12 @@ router.get("/service/:id/status.svg", async (req: Request, res: Response) => {
 });
 
 // GET dynamic SVG status badge for fleet, project, or individual target
-router.get("/:id/status.svg", async (req: Request, res: Response) => {
+router.get(["/:id/status.svg", "/:id.svg", "/:id"], async (req: Request, res: Response) => {
   try {
     await initDb();
     const db = getDb();
-    const { id } = req.params;
+    let rawId = req.params.id || "";
+    let id = decodeURIComponent(rawId).replace(/\.svg$/i, "").replace(/\/status$/i, "").trim();
     const metric = (req.query.metric as string) || "status";
     const customLabel = req.query.label as string | undefined;
     const redirectUrl = (req.query.link as string) || DEFAULT_REDIRECT_URL;
@@ -219,7 +237,7 @@ router.get("/:id/status.svg", async (req: Request, res: Response) => {
 
     // Fleet-wide aggregation badge
     if (id === "fleet") {
-      const svcRes = await db.execute("SELECT status, uptime_pct FROM services WHERE is_public = 1");
+      const svcRes = await db.execute("SELECT status, uptime_pct FROM services WHERE is_public = 1 OR is_public IS NULL");
       const services = svcRes.rows as any[];
 
       const hasCritical = services.some((s) => s.status === "critical");

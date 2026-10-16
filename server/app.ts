@@ -96,7 +96,7 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/services", servicesRoutes);
 app.use("/api/v1/groups", groupsRoutes);
 app.use("/api/v1/status", statusRoutes);
-app.use("/api/v1/badges", badgesRoutes);
+app.use(["/api/v1/badges", "/api/badges", "/badges"], badgesRoutes);
 app.use("/api/v1/alerts", alertsRoutes);
 app.use("/api/v1/incidents", incidentsRoutes);
 app.use("/api/v1/analytics", analyticsRoutes);

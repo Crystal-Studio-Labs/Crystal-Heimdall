@@ -150,8 +150,11 @@ export default function SettingsPage() {
       const data = await res.json();
       if (data && data.groups && Array.isArray(data.groups)) {
         setGroups(data.groups);
-        if (data.groups.length > 0 && !selectedBadgeGroup) {
-          setSelectedBadgeGroup(data.groups[0].name);
+        if (data.groups.length > 0) {
+          setSelectedBadgeGroup((prev) => {
+            const exists = data.groups.some((g: any) => g.name === prev);
+            return exists ? prev : data.groups[0].name;
+          });
         }
       }
     } catch (err) {
@@ -165,13 +168,17 @@ export default function SettingsPage() {
     try {
       const res = await fetch("/api/v1/services");
       const data = await res.json();
-      if (data && Array.isArray(data)) {
-        setAllServices(data);
-        if (data.length > 0 && !selectedBadgeService) {
-          setSelectedBadgeService(data[0].id);
-        }
+      const list = data?.services || (Array.isArray(data) ? data : []);
+      if (Array.isArray(list) && list.length > 0) {
+        setAllServices(list);
+        setSelectedBadgeService((prev) => {
+          const exists = list.some((s: any) => s.id === prev);
+          return exists ? prev : list[0].id;
+        });
       }
-    } catch {}
+    } catch (err) {
+      console.error("Failed to fetch services for badges", err);
+    }
   };
 
   const handleOpenCreateGroup = () => {
@@ -997,7 +1004,18 @@ export default function SettingsPage() {
                       <button
                         type="button"
                         key={scope.id}
-                        onClick={() => setBadgeScope(scope.id as any)}
+                        onClick={() => {
+                          const newScope = scope.id as any;
+                          setBadgeScope(newScope);
+                          if (newScope === "service") {
+                            const targetId = selectedBadgeService || (allServices.length > 0 ? allServices[0].id : "");
+                            if (targetId) {
+                              setBadgeRedirectUrl(`https://crystal-heimdall.vercel.app/service/${targetId}`);
+                            }
+                          } else {
+                            setBadgeRedirectUrl("https://crystal-heimdall.vercel.app/");
+                          }
+                        }}
                         className={`p-2 text-[10px] font-bold font-mono border transition text-center uppercase ${
                           badgeScope === scope.id
                             ? "bg-cyan-950 border-cyan-400 text-cyan-300"
@@ -1036,14 +1054,22 @@ export default function SettingsPage() {
                       </label>
                       <select
                         value={selectedBadgeService}
-                        onChange={(e) => setSelectedBadgeService(e.target.value)}
+                        onChange={(e) => {
+                          const svcId = e.target.value;
+                          setSelectedBadgeService(svcId);
+                          setBadgeRedirectUrl(`https://crystal-heimdall.vercel.app/service/${svcId}`);
+                        }}
                         className="w-full p-2 bg-zinc-950 border border-zinc-700 text-white font-mono text-xs focus:border-cyan-400 outline-none"
                       >
-                        {allServices.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name} [{s.group_name || "Production"}]
-                          </option>
-                        ))}
+                        {allServices.length === 0 ? (
+                          <option value="">No services registered</option>
+                        ) : (
+                          allServices.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} [{s.group_name || "Production"}]
+                            </option>
+                          ))
+                        )}
                       </select>
                     </div>
                   )}
@@ -1120,20 +1146,34 @@ export default function SettingsPage() {
                 if (badgeScope === "group") {
                   path = `/api/v1/badges/project/${encodeURIComponent(selectedBadgeGroup || "Production")}/status.svg`;
                 } else if (badgeScope === "service") {
-                  path = `/api/v1/badges/service/${encodeURIComponent(selectedBadgeService || allServices[0]?.id || "srv-auth")}/status.svg`;
+                  const svcId = selectedBadgeService || (allServices.length > 0 ? allServices[0].id : "srv-auth");
+                  path = `/api/v1/badges/service/${encodeURIComponent(svcId)}/status.svg`;
                 }
+
+                const matchedService = allServices.find((s) => s.id === selectedBadgeService);
+                const displayLabel = badgeCustomLabel.trim() || (
+                  badgeScope === "fleet" 
+                    ? "Fleet Status" 
+                    : badgeScope === "group" 
+                    ? (selectedBadgeGroup || "Production") 
+                    : (matchedService ? matchedService.name : "Service Status")
+                );
 
                 const params = new URLSearchParams();
                 if (badgeMetric !== "status") params.set("metric", badgeMetric);
                 if (badgeCustomLabel.trim()) params.set("label", badgeCustomLabel.trim());
-                const cleanRedirect = badgeRedirectUrl.trim() || "https://crystal-heimdall.vercel.app/";
+
+                const defaultRedirect = badgeScope === "service" && (selectedBadgeService || allServices[0]?.id)
+                  ? `https://crystal-heimdall.vercel.app/service/${selectedBadgeService || allServices[0]?.id}`
+                  : "https://crystal-heimdall.vercel.app/";
+                const cleanRedirect = badgeRedirectUrl.trim() || defaultRedirect;
+
                 if (cleanRedirect !== "https://crystal-heimdall.vercel.app/") {
                   params.set("link", cleanRedirect);
                 }
 
                 const qs = params.toString();
                 const badgeSvgUrl = `${origin}${path}${qs ? `?${qs}` : ""}`;
-                const displayLabel = badgeCustomLabel.trim() || (badgeScope === "fleet" ? "Fleet Status" : badgeScope === "group" ? selectedBadgeGroup : "Service Status");
 
                 const markdownSnippet = `[![${displayLabel}](${badgeSvgUrl})](${cleanRedirect})`;
                 const htmlSnippet = `<a href="${cleanRedirect}" target="_blank" rel="noopener noreferrer">\n  <img src="${badgeSvgUrl}" alt="${displayLabel}" />\n</a>`;

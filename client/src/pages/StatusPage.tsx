@@ -311,106 +311,6 @@ export default function StatusPage() {
           )}
         </div>
 
-        {/* INCIDENTS SECTION (DIRECTLY UNDER STATUS AREA) */}
-        {showIncidents && (
-          <div className="space-y-4">
-            {/* Active Incidents Alert Callout (Only when present) */}
-            {activeIncidents.length > 0 && (
-              <div className="p-4 bg-rose-950/70 border-2 border-rose-600 shadow-[3px_3px_0px_#000] space-y-3">
-                <div className="flex items-center space-x-2 text-rose-400 font-black text-xs uppercase tracking-wide">
-                  <AlertCircle className="w-4 h-4 animate-pulse shrink-0" />
-                  <span>ACTIVE INCIDENT IN PROGRESS ({activeIncidents.length})</span>
-                </div>
-                {activeIncidents.map((inc) => (
-                  <div key={inc.id} className="p-3 bg-black/80 border border-rose-800/80 space-y-1.5 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-white uppercase">{inc.title}</span>
-                      <span className="text-[10px] text-zinc-400 font-mono">
-                        {new Date(inc.last_seen_at).toLocaleTimeString()}
-                      </span>
-                    </div>
-                    {inc.message && (
-                      <p className="text-zinc-300 text-xs font-sans leading-relaxed">
-                        {inc.message}
-                      </p>
-                    )}
-                    <div className="pt-1">
-                      <Link 
-                        to={`/incidents/${inc.id}`}
-                        className="text-[10px] text-cyan-400 hover:text-cyan-300 uppercase font-bold flex items-center gap-1"
-                      >
-                        <span>View Timeline &amp; Diagnostics &rarr;</span>
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Past 30-Day Incident History (Directly Under Status Area) */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-xs font-black text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="w-1.5 h-3 bg-amber-400 inline-block" />
-                  <span>Incident History (Past 30 Days)</span>
-                </span>
-                <Link 
-                  to="/incidents" 
-                  className="text-[10px] text-cyan-400 hover:text-cyan-300 uppercase font-bold flex items-center gap-1"
-                >
-                  <span>Incident Archive &rarr;</span>
-                </Link>
-              </div>
-
-              {resolvedIncidents.length === 0 && activeIncidents.length === 0 ? (
-                <div className="p-3.5 bg-[#0b0f17] border border-zinc-800 text-center space-y-1">
-                  <p className="text-xs text-emerald-400 font-bold uppercase flex items-center justify-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>No incidents reported in the past 30 days.</span>
-                  </p>
-                  <p className="text-[10px] text-zinc-500 font-sans">
-                    All monitored systems operated with nominal availability.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {resolvedIncidents.slice(0, 5).map((inc) => (
-                    <div 
-                      key={inc.id} 
-                      className="p-3 bg-[#0b0f17] border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:border-zinc-700 transition"
-                    >
-                      <div className="space-y-0.5 min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <span className="px-1.5 py-0.5 text-[9px] font-black uppercase bg-emerald-950 border border-emerald-500 text-emerald-400 shrink-0">
-                            [RESOLVED]
-                          </span>
-                          <span className="font-bold text-white truncate">{inc.title}</span>
-                        </div>
-                        {inc.message && (
-                          <p className="text-zinc-400 text-[11px] font-sans truncate max-w-lg">
-                            {inc.message}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-3 shrink-0 self-end sm:self-auto">
-                        <span className="text-[10px] text-zinc-500 font-mono">
-                          {new Date(inc.last_seen_at).toLocaleDateString()}
-                        </span>
-                        <Link 
-                          to={`/incidents/${inc.id}`}
-                          className="text-[10px] text-cyan-400 hover:text-cyan-300 uppercase font-bold"
-                        >
-                          Details &rarr;
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* BROADCAST ANNOUNCEMENT BANNER (IF ACTIVE) */}
         {announcementType !== "none" && announcementBanner && (
           <div className={`p-3.5 border-2 shadow-[2px_2px_0px_#000] flex items-start gap-3 ${
@@ -430,6 +330,7 @@ export default function StatusPage() {
           </div>
         )}
 
+        {/* 1. MONITORED SERVICES FLEET (AT TOP UNDER HERO) */}
         {/* FILTER BAR */}
         <div className="flex items-center justify-between gap-3 pt-2">
           <div className="relative flex-1 max-w-xs">
@@ -542,6 +443,103 @@ export default function StatusPage() {
             ))
           )}
         </div>
+
+        {/* 2. ACTIVE INCIDENTS (DIRECTLY AFTER MONITORED SERVICES) */}
+        {activeIncidents.length > 0 && (
+          <div className="p-4 bg-rose-950/70 border-2 border-rose-600 shadow-[3px_3px_0px_#000] space-y-3">
+            <div className="flex items-center space-x-2 text-rose-400 font-black text-xs uppercase tracking-wide">
+              <AlertCircle className="w-4 h-4 animate-pulse shrink-0" />
+              <span>ACTIVE INCIDENT IN PROGRESS ({activeIncidents.length})</span>
+            </div>
+            {activeIncidents.map((inc) => (
+              <div key={inc.id} className="p-3 bg-black/80 border border-rose-800/80 space-y-1.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white uppercase">{inc.title}</span>
+                  <span className="text-[10px] text-zinc-400 font-mono">
+                    {new Date(inc.last_seen_at).toLocaleTimeString()}
+                  </span>
+                </div>
+                {inc.message && (
+                  <p className="text-zinc-300 text-xs font-sans leading-relaxed">
+                    {inc.message}
+                  </p>
+                )}
+                <div className="pt-1">
+                  <Link 
+                    to={`/incidents/${inc.id}`}
+                    className="text-[10px] text-cyan-400 hover:text-cyan-300 uppercase font-bold flex items-center gap-1"
+                  >
+                    <span>View Timeline &amp; Diagnostics &rarr;</span>
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 3. PAST 30-DAY INCIDENT HISTORY (AFTER ACTIVE INCIDENTS) */}
+        {showIncidents && (
+          <div className="space-y-2 pt-2">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs font-black text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-1.5 h-3 bg-amber-400 inline-block" />
+                <span>Incident History (Past 30 Days)</span>
+              </span>
+              <Link 
+                to="/incidents" 
+                className="text-[10px] text-cyan-400 hover:text-cyan-300 uppercase font-bold flex items-center gap-1"
+              >
+                <span>Incident Archive &rarr;</span>
+              </Link>
+            </div>
+
+            {resolvedIncidents.length === 0 && activeIncidents.length === 0 ? (
+              <div className="p-3.5 bg-[#0b0f17] border border-zinc-800 text-center space-y-1">
+                <p className="text-xs text-emerald-400 font-bold uppercase flex items-center justify-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>No incidents reported in the past 30 days.</span>
+                </p>
+                <p className="text-[10px] text-zinc-500 font-sans">
+                  All monitored systems operated with nominal availability.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {resolvedIncidents.slice(0, 5).map((inc) => (
+                  <div 
+                    key={inc.id} 
+                    className="p-3 bg-[#0b0f17] border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:border-zinc-700 transition"
+                  >
+                    <div className="space-y-0.5 min-w-0">
+                      <div className="flex items-center space-x-2">
+                        <span className="px-1.5 py-0.5 text-[9px] font-black uppercase bg-emerald-950 border border-emerald-500 text-emerald-400 shrink-0">
+                          [RESOLVED]
+                        </span>
+                        <span className="font-bold text-white truncate">{inc.title}</span>
+                      </div>
+                      {inc.message && (
+                        <p className="text-zinc-400 text-[11px] font-sans truncate max-w-lg">
+                          {inc.message}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-3 shrink-0 self-end sm:self-auto">
+                      <span className="text-[10px] text-zinc-500 font-mono">
+                        {new Date(inc.last_seen_at).toLocaleDateString()}
+                      </span>
+                      <Link 
+                        to={`/incidents/${inc.id}`}
+                        className="text-[10px] text-cyan-400 hover:text-cyan-300 uppercase font-bold"
+                      >
+                        Details &rarr;
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
 
         {/* CLEAN BRUTALIST FOOTER */}
