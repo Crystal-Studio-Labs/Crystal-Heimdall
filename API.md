@@ -115,6 +115,35 @@ Registers a new monitored target in the sentinel fleet.
 Triggers an immediate synthetic probe for a specific target (`[ PING NOW ]`).
 * **Access:** Operator JWT
 
+### `PUT /api/v1/services/:id`
+In-place modification of existing service target configurations (name, endpoint, port, interval, retry budget, keyword assertion, HTTP status range, project group tag).
+* **Access:** Operator JWT
+* **Side-Effect:** If HTTPS endpoint, automatically triggers TLS peer certificate re-inspection.
+
+### `POST /api/v1/services/batch`
+Executes atomic fleet operations across multiple target IDs:
+* **Actions:** `pause-all`, `resume-all`, `delete-selected`, `set-group` (e.g. `Production`, `Campus Relay`, `KrishiSetu`, `OSCC`).
+* **Access:** Operator JWT
+
+### `POST /api/v1/incidents/:id/updates`
+Appends a chronological operational update note to an incident:
+* **Access:** Operator JWT
+* **Stages:** `investigating`, `identified`, `monitoring`, `resolved`. Automatically resolves parent incident when status is `resolved`.
+
+### `GET /api/v1/badges/:id/status.svg`
+Generates a dynamic, Shields.io-compatible flat SVG status shield:
+* **Parameters:** `:id` (target ID, name, or `fleet`), `?metric=status|uptime|latency`, `?label=Custom`
+* **Access:** Public (Content-Type: `image/svg+xml`)
+
+### `GET /status/feed.xml`
+Public incident RSS 2.0 syndication feed for external feed readers, Slack RSS apps, and enterprise monitoring aggregators.
+* **Access:** Public (Content-Type: `application/rss+xml`)
+
+### `POST /api/v1/channels/test`
+Validates notification conduits by dispatching live test embeds/payloads:
+* **Supported Types:** `discord`, `telegram`, `generic` (Slack/n8n/Zapier webhook).
+* **Access:** Operator JWT
+
 ### `POST /api/v1/status/settings`
 Updates Uptime Kuma advanced engine parameters, poll intervals, SSL validation flags, and announcement banners.
 * **Access:** Operator JWT

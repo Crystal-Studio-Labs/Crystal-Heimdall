@@ -53,21 +53,30 @@ graph TD
 * Prevents alert storms during cascading service outages.
 * Groups recurring failures under an existing incident record within a 15-minute window while silently incrementing event counters.
 
-### D. Multi-Period SLA Availability Matrix
-* Maintains rolling availability percentages for 24-Hour, 7-Day, and 30-Day windows.
-* Computes latency percentiles (P50, P95, P99) and Mean Time to Recovery (MTTR).
+### E. Native TCP Socket & TLS/SSL Peer Certificate Prober
+* Probes raw TCP ports using non-blocking Node.js `net.Socket` connections with strict timeout enforcement.
+* Performs deep TLS handshakes via `tls.connect` to inspect remote peer X.509 certificates and calculate actual days remaining to expiry without depending on external SSL APIs.
+
+### F. Dynamic SVG Status Shields & Public RSS Syndicate
+* Generates pixel-crisp, Shields.io-compatible Industrial Brutalist SVG status shields directly from server memory (`/api/v1/badges/:id/status.svg`).
+* Syndicates public incident updates via standard RSS 2.0 XML (`/status/feed.xml`) for external feed readers, Slack RSS integrations, and enterprise dashboard feeds.
+
+### G. Mobile Sentinel & Lockscreen Audio Pipeline
+* Combines PWA Service Worker push notifications (`ServiceWorkerRegistration.showNotification()`), multi-pulse tactile vibration, and continuous looping Web Audio klaxons.
+* Uses the W3C `navigator.mediaSession` standard to preserve audio playback priority across mobile lock screens, alongside Screen Wake Lock API (`navigator.wakeLock`) support.
 
 ---
 
 ## 3. Database Schema (LibSQL / SQLite)
 
-The embedded LibSQL database (`data/heimdall.db`) stores configuration and state in four optimized tables:
+The embedded LibSQL database (`data/heimdall.db`) stores configuration and state in six optimized tables with composite performance indexing:
 
-1. **`services`**: Monitored endpoints, check types, poll intervals, status (`healthy`, `degraded`, `down`, `maintenance`), and isolated API keys.
+1. **`services`**: Monitored endpoints, check types (`http-poll`, `port-check`, `deadman-cron`), poll intervals, port numbers, keyword assertions, status (`healthy`, `degraded`, `critical`, `maintenance`), project tags (`group_name`), and isolated API keys.
 2. **`incidents`**: Identified outages, severity (`info`, `warning`, `critical`), triage state (`investigating`, `acknowledged`, `resolved`), and resolution timestamps.
-3. **`telemetry_pings`**: Time-series log of all synthetic probes and response times for SLA graphing.
-4. **`status_settings`**: Configurable branding, announcement banners, SLA toggles, and engine tuning.
-5. **`error_issues`**: Passive crash reports with stack traces, environment tags, and triage status.
+3. **`incident_updates`**: Chronological multi-stage operational updates (`investigating`, `identified`, `monitoring`, `resolved`) with composite index `idx_incident_updates_inc_time`.
+4. **`telemetry_points`**: Time-series log of all synthetic probes and response times for SLA graphing, backed by composite index `idx_telemetry_svc_time (service_id, recorded_at)`.
+5. **`status_settings`**: Configurable branding, announcement banners, SLA toggles, and engine tuning.
+6. **`error_issues`**: Passive crash reports with stack traces, environment tags, and triage status.
 
 ---
 
