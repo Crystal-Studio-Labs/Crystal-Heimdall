@@ -18,11 +18,14 @@ import {
   Lock,
   Activity,
   Mail,
-  Shield
+  Shield,
+  LayoutDashboard,
+  LogOut
 } from "lucide-react";
 import HeartbeatBars, { HistoryBlock } from "../components/HeartbeatBars";
 import { useToast } from "../lib/ToastContext";
 import { isAudioMuted, setAudioMuted, playCriticalAlarm, playTestSound } from "../lib/audioAlerts";
+import { isOperatorAuthenticated, clearAuthToken, getSessionInfo } from "../lib/api";
 import SEO from "../components/SEO";
 
 interface PublicService {
@@ -61,6 +64,8 @@ interface StatusPageSettings {
 export default function StatusPage() {
   const toast = useToast();
   const [muted, setMuted] = useState(isAudioMuted());
+  const [isAuthenticated, setIsAuthenticated] = useState(() => isOperatorAuthenticated());
+  const session = getSessionInfo();
   
   const [data, setData] = useState<{
     overallStatus: "operational" | "degraded" | "outage";
@@ -250,6 +255,19 @@ export default function StatusPage() {
               <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-emerald-400" : ""}`} />
               <span className="hidden sm:inline">REFRESH</span>
             </button>
+
+            {/* Operator Session Action (only when already logged in) */}
+            {isAuthenticated && (
+              <Link
+                to="/dashboard"
+                className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black border-2 border-emerald-400 font-bold transition flex items-center gap-1.5 text-xs font-mono shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                title={`Active 7+ Day Session (~${session.daysRemaining}d left). Return to Command Deck`}
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">[ OPERATOR DECK ]</span>
+                <span className="sm:hidden">DECK</span>
+              </Link>
+            )}
           </div>
         </div>
       </header>
@@ -584,6 +602,15 @@ export default function StatusPage() {
                           {inc.message}
                         </p>
                       )}
+
+                      <div className="pt-1 flex justify-end">
+                        <Link
+                          to={`/incidents/${inc.id}`}
+                          className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 uppercase tracking-tight flex items-center gap-1"
+                        >
+                          <span>[ VIEW TIMELINE & POSTMORTEM → ]</span>
+                        </Link>
+                      </div>
                     </div>
                   );
                 })}
@@ -617,7 +644,7 @@ export default function StatusPage() {
 
         {/* PROPER INDUSTRIAL BRUTALIST FOOTER WITH CRYSTAL STUDIO LABS DATA */}
         <footer className="mt-16 border-t-2 border-zinc-800 bg-[#070a0f] pt-10 pb-8 text-xs font-mono">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pb-8 border-b-2 border-zinc-800/80">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pb-8 border-b-2 border-zinc-800/80">
             {/* Col 1: Crystal Studio Labs Identity */}
             <div className="space-y-3">
               <div className="flex items-center space-x-2">
@@ -645,60 +672,7 @@ export default function StatusPage() {
               </div>
             </div>
 
-            {/* Col 2: Monitored Fleet & Ecosystem */}
-            <div className="space-y-3">
-              <span className="text-[10px] text-zinc-500 font-bold tracking-widest uppercase block border-b border-zinc-800 pb-1">
-                // ECOSYSTEM FLEET //
-              </span>
-              <ul className="space-y-2 text-xs">
-                <li>
-                  <a
-                    href="https://github.com/Crystal-Studio-Labs/Argus"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-zinc-300 hover:text-emerald-400 transition flex items-center justify-between group"
-                  >
-                    <span>Argus — Security & PR Sentinel</span>
-                    <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-emerald-400" />
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://github.com/Crystal-Studio-Labs/Campus-Relay"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-zinc-300 hover:text-emerald-400 transition flex items-center justify-between group"
-                  >
-                    <span>Campus Relay — Decentralized Network</span>
-                    <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-emerald-400" />
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://github.com/Crystal-Studio-Labs/KrishiSetu-ML-Model"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-zinc-300 hover:text-emerald-400 transition flex items-center justify-between group"
-                  >
-                    <span>KrishiSetu AI — Edge ML Diagnostics</span>
-                    <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-emerald-400" />
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://github.com/Crystal-Studio-Labs"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-zinc-300 hover:text-cyan-400 transition flex items-center justify-between group"
-                  >
-                    <span>Crystal Studio Labs Org Repositories</span>
-                    <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-cyan-400" />
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            {/* Col 3: Reliability & Protocol Specs */}
+            {/* Col 2: Reliability & Protocol Specs */}
             <div className="space-y-3">
               <span className="text-[10px] text-zinc-500 font-bold tracking-widest uppercase block border-b border-zinc-800 pb-1">
                 // PROTOCOL STANDARDS //
@@ -743,13 +717,6 @@ export default function StatusPage() {
                 [ OVERVIEW ]
               </Link>
 
-              <Link
-                to="/docs"
-                className="text-zinc-400 hover:text-purple-400 text-xs font-bold transition uppercase"
-              >
-                [ API DOCS ]
-              </Link>
-
               <a
                 href={settings.support_url || "https://github.com/Crystal-Studio-Labs"}
                 target="_blank"
@@ -760,15 +727,40 @@ export default function StatusPage() {
                 <ExternalLink className="w-3 h-3" />
               </a>
 
-              {/* Minimal Operator Login */}
-              <Link
-                to="/login"
-                className="px-2.5 py-1 bg-black hover:bg-zinc-900 border border-zinc-700 hover:border-emerald-500 text-zinc-400 hover:text-emerald-400 text-[10px] font-mono font-bold tracking-wider transition flex items-center gap-1.5 shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
-                title="Direct 2FA Operator Console Access"
-              >
-                <Lock className="w-3 h-3 text-emerald-400" />
-                <span>[ OPERATOR 2FA ]</span>
-              </Link>
+              {/* Discreet Operator Access (Private Infrastructure) */}
+              {isAuthenticated ? (
+                <div className="flex items-center gap-2">
+                  <Link
+                    to="/dashboard"
+                    className="px-2.5 py-1 bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500 text-emerald-400 text-[10px] font-mono font-bold tracking-wider transition flex items-center gap-1.5 shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                    title={`Session valid for ~${session.daysRemaining} days. Access Operator Command Deck`}
+                  >
+                    <LayoutDashboard className="w-3 h-3 text-emerald-400" />
+                    <span>[ OPERATOR DECK ]</span>
+                  </Link>
+                  <button
+                    onClick={() => {
+                      clearAuthToken();
+                      setIsAuthenticated(false);
+                      toast.info("Signed out of Operator Console");
+                    }}
+                    className="px-2 py-1 bg-black hover:bg-rose-950 border border-zinc-700 hover:border-rose-600 text-zinc-400 hover:text-rose-300 text-[10px] font-mono font-bold tracking-wider transition flex items-center gap-1 shadow-[2px_2px_0px_#000]"
+                    title="Sign Out of Active Session"
+                  >
+                    <LogOut className="w-3 h-3 text-rose-400" />
+                    <span>LOGOUT</span>
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  to="/login"
+                  className="px-2 py-1 text-zinc-600 hover:text-zinc-300 border border-transparent hover:border-zinc-800 text-[10px] font-mono tracking-wider transition flex items-center gap-1.5 active:translate-x-[1px] active:translate-y-[1px]"
+                  title="Operator Console"
+                >
+                  <Lock className="w-2.5 h-2.5 text-zinc-600" />
+                  <span>[ OPERATOR ACCESS ]</span>
+                </Link>
+              )}
             </div>
           </div>
         </footer>

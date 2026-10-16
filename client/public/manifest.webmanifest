@@ -4,6 +4,8 @@
   "start_url": "/",
   "id": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "scope": "/",
   "background_color": "#070a0f",
   "theme_color": "#070a0f",
   "description": "Continuous Multi-Point Health Monitoring, Sentry Crash Telemetry & Real-Time Incident Status",
@@ -32,6 +34,26 @@
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Live Status Board",
+      "short_name": "Status",
+      "url": "/",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Operator Command Deck",
+      "short_name": "Command Deck",
+      "url": "/dashboard",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Telemetry Analytics",
+      "short_name": "Analytics",
+      "url": "/dashboard/analytics",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ],
   "categories": ["utilities", "developer tools", "productivity"]

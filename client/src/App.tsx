@@ -36,9 +36,12 @@ export default function App() {
           <Route path="/incidents" element={<IncidentsPage />} />
           <Route path="/incidents/:id" element={<IncidentDetailPage />} />
 
-          {/* Public Developer Reference & Documentation */}
-          <Route path="/docs" element={<DocsPage />} />
-          <Route path="/api-docs" element={<Navigate to="/docs" replace />} />
+          {/* Internal Documentation (Operator only; unauthenticated redirected to /) */}
+          <Route 
+            path="/docs" 
+            element={getAuthToken() ? <DocsPage /> : <Navigate to="/" replace />} 
+          />
+          <Route path="/api-docs" element={<Navigate to="/" replace />} />
 
           {/* Operator Authentication Gate */}
           <Route path="/login" element={<LoginPage />} />

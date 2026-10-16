@@ -25,7 +25,10 @@ import {
   Database,
   Cpu,
   Layers,
-  Server
+  Server,
+  Webhook,
+  Rss,
+  ExternalLink
 } from "lucide-react";
 import { useToast } from "../lib/ToastContext";
 
@@ -291,6 +294,44 @@ export default function SettingsPage() {
       toast.error(err.message);
     } finally {
       setTelegramTesting(false);
+    }
+  };
+
+  // Generic Webhook State
+  const [genericWebhookUrl, setGenericWebhookUrl] = useState(
+    localStorage.getItem("heimdall_generic_webhook") || ""
+  );
+  const [genericTesting, setGenericTesting] = useState(false);
+  const [genericStatus, setGenericStatus] = useState<string | null>(null);
+
+  const handleTestGenericWebhook = async () => {
+    if (!genericWebhookUrl.trim()) {
+      setGenericStatus("Please enter a Generic Webhook URL first.");
+      toast.error("Please enter a Generic Webhook URL");
+      return;
+    }
+    setGenericTesting(true);
+    setGenericStatus(null);
+    try {
+      localStorage.setItem("heimdall_generic_webhook", genericWebhookUrl.trim());
+      const res = await fetch("/api/v1/channels/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "generic", webhookUrl: genericWebhookUrl.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setGenericStatus("✅ Test alert successfully dispatched to generic webhook endpoint!");
+        toast.success("Test payload delivered to generic webhook!");
+      } else {
+        setGenericStatus(`❌ Dispatch failed: ${data.message || data.error || "Unknown error"}`);
+        toast.error("Generic webhook dispatch failed");
+      }
+    } catch (err: any) {
+      setGenericStatus(`❌ Network error: ${err.message}`);
+      toast.error(err.message);
+    } finally {
+      setGenericTesting(false);
     }
   };
 
@@ -829,129 +870,273 @@ curl -fsS -m 10 --retry 3 https://status.crystalstudio.labs/api/v1/ping/YOUR_API
           </div>
         )}
 
-        {/* TAB 3: EMERGENCY RELAYS (DISCORD & TELEGRAM) */}
+        {/* TAB 3: EMERGENCY RELAYS (DISCORD, TELEGRAM & GENERIC WEBHOOK) */}
         {activeTab === "alerts" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Discord */}
-            <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 space-y-5 flex flex-col justify-between">
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-zinc-900 border-2 border-[#5865F2] flex items-center justify-center text-[#5865F2]">
-                    <MessageSquare className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-black text-white text-sm uppercase">Discord Webhook Relay</h3>
-                    <p className="text-[11px] text-zinc-400 font-sans">Rich embeds with color-coded severity & traces</p>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-mono text-zinc-400 block mb-1 font-bold uppercase">
-                    DISCORD WEBHOOK URL
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showDiscord ? "text" : "password"}
-                      placeholder="https://discord.com/api/webhooks/..."
-                      value={discordWebhookUrl}
-                      onChange={(e) => setDiscordWebhookUrl(e.target.value)}
-                      className="w-full p-2.5 bg-black border-2 border-zinc-700 pr-10 text-white font-mono text-xs focus:border-[#5865F2] outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowDiscord(!showDiscord)}
-                      className="absolute right-3 top-2.5 text-zinc-500 hover:text-zinc-300"
-                    >
-                      {showDiscord ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                {discordStatus && (
-                  <div className="p-3 bg-black border border-zinc-800 text-[11px] font-mono">
-                    {discordStatus}
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-4 border-t-2 border-zinc-800">
-                <button
-                  onClick={handleTestDiscord}
-                  disabled={discordTesting}
-                  className="w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 border-2 border-[#5865F2] text-[#a5b4fc] text-xs font-bold uppercase flex items-center justify-center gap-2 active:translate-x-[1px] active:translate-y-[1px]"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{discordTesting ? "Dispatching..." : "Send Test Discord Embed"}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Telegram */}
-            <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 space-y-5 flex flex-col justify-between">
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-zinc-900 border-2 border-[#229ED9] flex items-center justify-center text-[#229ED9]">
-                    <Send className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-black text-white text-sm uppercase">Telegram Bot Relay</h3>
-                    <p className="text-[11px] text-zinc-400 font-sans">Instant mobile push notifications</p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-[10px] font-mono text-zinc-400 block mb-1 font-bold uppercase">
-                      TELEGRAM BOT TOKEN
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showTelegramToken ? "text" : "password"}
-                        placeholder="123456789:ABCdefGhIJKlmNoPQRstuVWxyz"
-                        value={telegramToken}
-                        onChange={(e) => setTelegramToken(e.target.value)}
-                        className="w-full p-2.5 bg-black border-2 border-zinc-700 pr-10 text-white font-mono text-xs focus:border-[#229ED9] outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowTelegramToken(!showTelegramToken)}
-                        className="absolute right-3 top-2.5 text-zinc-500 hover:text-zinc-300"
-                      >
-                        {showTelegramToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Discord */}
+              <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 space-y-5 flex flex-col justify-between">
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-zinc-900 border-2 border-[#5865F2] flex items-center justify-center text-[#5865F2]">
+                      <MessageSquare className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-white text-sm uppercase">Discord Relay</h3>
+                      <p className="text-[11px] text-zinc-400 font-sans">Rich embeds with severity & traces</p>
                     </div>
                   </div>
 
                   <div>
                     <label className="text-[10px] font-mono text-zinc-400 block mb-1 font-bold uppercase">
-                      TARGET CHAT ID
+                      DISCORD WEBHOOK URL
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showDiscord ? "text" : "password"}
+                        placeholder="https://discord.com/api/webhooks/..."
+                        value={discordWebhookUrl}
+                        onChange={(e) => setDiscordWebhookUrl(e.target.value)}
+                        className="w-full p-2.5 bg-black border-2 border-zinc-700 pr-10 text-white font-mono text-xs focus:border-[#5865F2] outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowDiscord(!showDiscord)}
+                        className="absolute right-3 top-2.5 text-zinc-500 hover:text-zinc-300"
+                      >
+                        {showDiscord ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {discordStatus && (
+                    <div className="p-3 bg-black border border-zinc-800 text-[11px] font-mono">
+                      {discordStatus}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t-2 border-zinc-800">
+                  <button
+                    onClick={handleTestDiscord}
+                    disabled={discordTesting}
+                    className="w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 border-2 border-[#5865F2] text-[#a5b4fc] text-xs font-bold uppercase flex items-center justify-center gap-2 active:translate-x-[1px] active:translate-y-[1px]"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{discordTesting ? "Dispatching..." : "Send Test Discord"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Telegram */}
+              <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 space-y-5 flex flex-col justify-between">
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-zinc-900 border-2 border-[#229ED9] flex items-center justify-center text-[#229ED9]">
+                      <Send className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-white text-sm uppercase">Telegram Bot</h3>
+                      <p className="text-[11px] text-zinc-400 font-sans">Instant mobile push notifications</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[10px] font-mono text-zinc-400 block mb-1 font-bold uppercase">
+                        TELEGRAM BOT TOKEN
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showTelegramToken ? "text" : "password"}
+                          placeholder="123456789:ABCdefGhIJKlmNoPQRstuVWxyz"
+                          value={telegramToken}
+                          onChange={(e) => setTelegramToken(e.target.value)}
+                          className="w-full p-2.5 bg-black border-2 border-zinc-700 pr-10 text-white font-mono text-xs focus:border-[#229ED9] outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowTelegramToken(!showTelegramToken)}
+                          className="absolute right-3 top-2.5 text-zinc-500 hover:text-zinc-300"
+                        >
+                          {showTelegramToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-mono text-zinc-400 block mb-1 font-bold uppercase">
+                        TARGET CHAT ID
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 987654321"
+                        value={telegramChatId}
+                        onChange={(e) => setTelegramChatId(e.target.value)}
+                        className="w-full p-2.5 bg-black border-2 border-zinc-700 text-white font-mono text-xs focus:border-[#229ED9] outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {telegramStatus && (
+                    <div className="p-3 bg-black border border-zinc-800 text-[11px] font-mono">
+                      {telegramStatus}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t-2 border-zinc-800">
+                  <button
+                    onClick={handleTestTelegram}
+                    disabled={telegramTesting}
+                    className="w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 border-2 border-[#229ED9] text-[#7dd3fc] text-xs font-bold uppercase flex items-center justify-center gap-2 active:translate-x-[1px] active:translate-y-[1px]"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{telegramTesting ? "Dispatching..." : "Send Test Telegram"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Generic Webhook */}
+              <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 space-y-5 flex flex-col justify-between">
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-zinc-900 border-2 border-emerald-500 flex items-center justify-center text-emerald-400">
+                      <Webhook className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-white text-sm uppercase">Generic Webhook</h3>
+                      <p className="text-[11px] text-zinc-400 font-sans">Slack, n8n, Zapier & custom relays</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-mono text-zinc-400 block mb-1 font-bold uppercase">
+                      WEBHOOK ENDPOINT URL
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. 987654321"
-                      value={telegramChatId}
-                      onChange={(e) => setTelegramChatId(e.target.value)}
-                      className="w-full p-2.5 bg-black border-2 border-zinc-700 text-white font-mono text-xs focus:border-[#229ED9] outline-none"
+                      placeholder="https://hooks.slack.com/... or https://n8n.internal/..."
+                      value={genericWebhookUrl}
+                      onChange={(e) => setGenericWebhookUrl(e.target.value)}
+                      className="w-full p-2.5 bg-black border-2 border-zinc-700 text-white font-mono text-xs focus:border-emerald-400 outline-none"
                     />
+                    <span className="text-[10px] text-zinc-500 mt-1 block">Receives standard structured JSON incident alerts</span>
+                  </div>
+
+                  {genericStatus && (
+                    <div className="p-3 bg-black border border-zinc-800 text-[11px] font-mono">
+                      {genericStatus}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t-2 border-zinc-800">
+                  <button
+                    onClick={handleTestGenericWebhook}
+                    disabled={genericTesting}
+                    className="w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 border-2 border-emerald-500 text-emerald-300 text-xs font-bold uppercase flex items-center justify-center gap-2 active:translate-x-[1px] active:translate-y-[1px]"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{genericTesting ? "Dispatching..." : "Send Test Webhook"}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Dynamic Badges & RSS Feed Hub */}
+            <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 sm:p-8 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-zinc-800 pb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-9 h-9 bg-zinc-900 border-2 border-cyan-500 flex items-center justify-center text-cyan-400">
+                    <Rss className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-black text-white uppercase">
+                      Dynamic SVG Badges & Public Incident RSS Feed
+                    </h2>
+                    <p className="text-xs text-zinc-400 font-sans">
+                      Embed live status shields into GitHub READMEs and subscribe via RSS readers.
+                    </p>
                   </div>
                 </div>
 
-                {telegramStatus && (
-                  <div className="p-3 bg-black border border-zinc-800 text-[11px] font-mono">
-                    {telegramStatus}
-                  </div>
-                )}
+                <a
+                  href="/status/feed.xml"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:border-cyan-400 text-cyan-300 text-xs font-bold uppercase flex items-center gap-1.5 self-start sm:self-auto transition"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>[ OPEN RSS FEED XML ]</span>
+                </a>
               </div>
 
-              <div className="pt-4 border-t-2 border-zinc-800">
-                <button
-                  onClick={handleTestTelegram}
-                  disabled={telegramTesting}
-                  className="w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 border-2 border-[#229ED9] text-[#7dd3fc] text-xs font-bold uppercase flex items-center justify-center gap-2 active:translate-x-[1px] active:translate-y-[1px]"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{telegramTesting ? "Dispatching..." : "Send Test Telegram Alert"}</span>
-                </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* SVG Status Badge Preview & Markdown */}
+                <div className="space-y-3 p-4 bg-black border border-zinc-800">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white uppercase flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                      Dynamic Status Shield
+                    </span>
+                    <span className="text-[10px] text-zinc-500 font-mono">Shields.io Compatible</span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 py-2">
+                    <img src="/api/v1/badges/fleet/status.svg" alt="Fleet Status Badge" className="h-5" />
+                    <img src="/api/v1/badges/fleet/status.svg?metric=uptime" alt="Fleet Uptime Badge" className="h-5" />
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-zinc-500 uppercase font-bold">README Embed Markdown:</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        readOnly
+                        value={`![Status](${window.location.origin}/api/v1/badges/fleet/status.svg)`}
+                        className="w-full p-2 bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-300 font-mono outline-none"
+                      />
+                      <button
+                        onClick={() => handleCopy("badge", `![Status](${window.location.origin}/api/v1/badges/fleet/status.svg)`)}
+                        className="px-3 py-2 bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white text-xs font-bold shrink-0"
+                      >
+                        {copiedKey === "badge" ? "COPIED" : "COPY"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* RSS Incident Feed */}
+                <div className="space-y-3 p-4 bg-black border border-zinc-800">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white uppercase flex items-center gap-1.5">
+                      <Rss className="w-3.5 h-3.5 text-cyan-400" />
+                      Incident RSS 2.0 Feed
+                    </span>
+                    <span className="text-[10px] text-zinc-500 font-mono">Live Syndicate</span>
+                  </div>
+
+                  <p className="text-xs text-zinc-400 font-sans leading-relaxed">
+                    External incident management systems, Slack RSS integrations, and reader clients can subscribe directly to this endpoint:
+                  </p>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-zinc-500 uppercase font-bold">Public Feed URL:</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        readOnly
+                        value={`${window.location.origin}/status/feed.xml`}
+                        className="w-full p-2 bg-zinc-950 border border-zinc-800 text-[11px] text-cyan-300 font-mono outline-none"
+                      />
+                      <button
+                        onClick={() => handleCopy("rss", `${window.location.origin}/status/feed.xml`)}
+                        className="px-3 py-2 bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white text-xs font-bold shrink-0"
+                      >
+                        {copiedKey === "rss" ? "COPIED" : "COPY"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

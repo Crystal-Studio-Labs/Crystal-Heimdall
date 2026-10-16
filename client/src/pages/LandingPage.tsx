@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Navbar from "../components/Navbar";
 import SEO from "../components/SEO";
+import { isOperatorAuthenticated } from "../lib/api";
 
 interface PublicServicePreview {
   id: string;
@@ -25,6 +26,7 @@ interface PublicServicePreview {
 }
 
 export default function LandingPage() {
+  const isAuthenticated = isOperatorAuthenticated();
   const [statusInfo, setStatusInfo] = useState<{
     overallStatus: string;
     avgUptime: number;
@@ -122,21 +124,15 @@ export default function LandingPage() {
               <span>[02] INCIDENT LEDGER</span>
             </Link>
 
-            <Link
-              to="/docs"
-              className="px-6 py-3.5 bg-zinc-900 hover:bg-zinc-800 text-cyan-300 hover:text-white border-2 border-zinc-700 hover:border-cyan-500 text-xs sm:text-sm font-bold uppercase transition flex items-center justify-center space-x-2 shadow-[3px_3px_0px_#000]"
-            >
-              <Code2 className="w-4 h-4 text-cyan-400" />
-              <span>[03] DEVELOPER API</span>
-            </Link>
-
-            <Link
-              to="/login"
-              className="px-6 py-3.5 btn-secondary text-xs sm:text-sm flex items-center justify-center space-x-2"
-            >
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>[04] OPERATOR CONSOLE</span>
-            </Link>
+            {isAuthenticated && (
+              <Link
+                to="/dashboard"
+                className="px-6 py-3.5 btn-secondary text-xs sm:text-sm flex items-center justify-center space-x-2"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>[03] OPERATOR COMMAND DECK</span>
+              </Link>
+            )}
           </div>
         </section>
 
@@ -292,8 +288,11 @@ export default function LandingPage() {
           <div className="flex flex-wrap items-center gap-4 text-zinc-400">
             <Link to="/" className="hover:text-white transition uppercase">[ STATUS ]</Link>
             <Link to="/incidents" className="hover:text-white transition uppercase">[ INCIDENTS ]</Link>
-            <Link to="/docs" className="hover:text-white transition uppercase">[ API DOCS ]</Link>
-            <Link to="/login" className="hover:text-white transition uppercase">[ OPERATOR GATE ]</Link>
+            {isAuthenticated && (
+              <Link to="/dashboard" className="hover:text-white transition uppercase">
+                [ COMMAND DECK ]
+              </Link>
+            )}
             <span>&copy; {new Date().getFullYear()} Crystal Studio Labs</span>
           </div>
         </div>

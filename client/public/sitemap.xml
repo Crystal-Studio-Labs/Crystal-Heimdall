@@ -26,20 +26,4 @@
     <changefreq>hourly</changefreq>
     <priority>0.9</priority>
   </url>
-
-  <!-- Developer API & Telemetry Guide -->
-  <url>
-    <loc>https://status.crystalstudio.labs/docs</loc>
-    <lastmod>2026-10-10</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-
-  <!-- Operator 2FA Access Gate -->
-  <url>
-    <loc>https://status.crystalstudio.labs/login</loc>
-    <lastmod>2026-10-10</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.3</priority>
-  </url>
 </urlset>

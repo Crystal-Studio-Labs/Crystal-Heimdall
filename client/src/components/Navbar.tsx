@@ -13,7 +13,7 @@ import {
   VolumeX,
   BellRing,
 } from "lucide-react";
-import { getAuthToken, clearAuthToken } from "../lib/api";
+import { getAuthToken, clearAuthToken, isOperatorAuthenticated, getSessionInfo } from "../lib/api";
 import { useToast } from "../lib/ToastContext";
 import { isAudioMuted, setAudioMuted, playTestSound } from "../lib/audioAlerts";
 
@@ -21,7 +21,8 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
-  const isAuthenticated = !!getAuthToken();
+  const isAuthenticated = isOperatorAuthenticated();
+  const session = getSessionInfo();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [muted, setMuted] = useState(isAudioMuted());
 
@@ -156,14 +157,6 @@ export default function Navbar() {
               >
                 INCIDENTS
               </Link>
-              <Link
-                to="/docs"
-                className={`px-2.5 py-1.5 text-xs font-mono font-bold transition ${
-                  location.pathname === "/docs" ? "text-cyan-300" : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                DOCS
-              </Link>
             </>
           ) : (
             <div className="flex items-center space-x-1 text-xs font-mono font-bold">
@@ -197,16 +190,6 @@ export default function Navbar() {
               >
                 OVERVIEW
               </Link>
-              <Link
-                to="/docs"
-                className={`px-3 py-1.5 border transition ${
-                  location.pathname === "/docs"
-                    ? "bg-zinc-900 border-purple-500 text-purple-300"
-                    : "border-transparent text-zinc-400 hover:text-white hover:border-zinc-800"
-                }`}
-              >
-                API DOCS
-              </Link>
             </div>
           )}
         </nav>
@@ -224,10 +207,13 @@ export default function Navbar() {
             <span>PUBLIC STATUS</span>
           </Link>
 
-          {isAuthenticated ? (
+          {isAuthenticated && (
             <div className="flex items-center space-x-2">
-              <span className="px-2 py-1 text-[10px] font-mono bg-emerald-950/60 border border-emerald-500/60 text-emerald-400 font-bold uppercase">
-                [OPERATOR]
+              <span
+                className="px-2 py-1 text-[10px] font-mono bg-emerald-950/60 border border-emerald-500/60 text-emerald-400 font-bold uppercase cursor-help"
+                title={`Active 2FA session valid for ~${session.daysRemaining} days (expires ${session.expiresAt ? new Date(session.expiresAt).toLocaleDateString() : "in 30 days"})`}
+              >
+                [OPERATOR{session.daysRemaining ? `: ~${session.daysRemaining}d` : ""}]
               </span>
               <button
                 onClick={handleLogout}
@@ -237,14 +223,6 @@ export default function Navbar() {
                 <LogOut className="w-3.5 h-3.5" />
               </button>
             </div>
-          ) : (
-            <Link
-              to="/login"
-              className="px-4 py-2 bg-emerald-400 hover:bg-emerald-300 text-black border-2 border-emerald-300 text-xs font-mono font-black uppercase tracking-wider flex items-center gap-1.5 shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>OPERATOR LOGIN</span>
-            </Link>
           )}
         </div>
 
@@ -285,7 +263,7 @@ export default function Navbar() {
               [ LIVE STATUS ]
             </Link>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <Link
                 to="/incidents"
                 onClick={() => setMobileMenuOpen(false)}
@@ -300,30 +278,15 @@ export default function Navbar() {
               >
                 OVERVIEW
               </Link>
-              <Link
-                to="/docs"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-2 py-1.5 bg-zinc-950 border border-zinc-800 text-purple-300 text-center font-bold"
-              >
-                API DOCS
-              </Link>
             </div>
 
-            {isAuthenticated ? (
+            {isAuthenticated && (
               <button
                 onClick={handleLogout}
                 className="w-full px-3 py-2 bg-rose-950/60 border border-rose-700 text-rose-300 text-center font-bold"
               >
                 SIGN OUT OPERATOR
               </button>
-            ) : (
-              <Link
-                to="/login"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 bg-emerald-400 text-black border border-emerald-300 text-center font-black"
-              >
-                OPERATOR LOGIN
-              </Link>
             )}
           </div>
         </div>

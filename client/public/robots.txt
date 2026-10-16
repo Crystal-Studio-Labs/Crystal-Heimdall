@@ -4,12 +4,14 @@ Allow: /
 Allow: /overview
 Allow: /incidents
 Allow: /incidents/*
-Allow: /docs
 Allow: /sitemap.xml
 
-# Disallow private operator control routes and raw API endpoints from search index
+# Disallow private operator control routes, docs, and authentication gate
 Disallow: /dashboard/
 Disallow: /dashboard/*
+Disallow: /login
+Disallow: /docs
+Disallow: /api-docs
 Disallow: /api/
 
 # XML Sitemap Index
