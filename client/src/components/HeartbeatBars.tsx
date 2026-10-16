@@ -8,9 +8,10 @@ export interface HistoryBlock {
 
 interface HeartbeatBarsProps {
   blocks: HistoryBlock[];
+  compact?: boolean;
 }
 
-export default function HeartbeatBars({ blocks }: HeartbeatBarsProps) {
+export default function HeartbeatBars({ blocks, compact = false }: HeartbeatBarsProps) {
   const [hoveredBlock, setHoveredBlock] = useState<{ block: HistoryBlock; index: number } | null>(null);
 
   // Fallback to 30 empty/nominal blocks if data not provided
@@ -23,10 +24,10 @@ export default function HeartbeatBars({ blocks }: HeartbeatBarsProps) {
       }));
 
   return (
-    <div className="space-y-2 pt-2 relative font-mono">
+    <div className={`relative font-mono ${compact ? "space-y-0 pt-0" : "space-y-2 pt-2"}`}>
       {/* 30-Day Segmented Bars (0px Sharp Industrial Rectangles) */}
       <div 
-        className="grid grid-cols-30 gap-[3px] sm:gap-1 h-7"
+        className={`grid grid-cols-30 gap-[2px] sm:gap-1 ${compact ? "h-3.5 sm:h-4" : "h-7"}`}
         role="region"
         aria-label="30-day availability history"
       >
@@ -86,24 +87,26 @@ export default function HeartbeatBars({ blocks }: HeartbeatBarsProps) {
       )}
 
       {/* Legend & Timeline Boundaries */}
-      <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono pt-1 select-none">
-        <span>[ 30 DAYS AGO ]</span>
-        <div className="flex items-center space-x-4 text-[10px]">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 bg-emerald-400 inline-block" />
-            <span className="text-zinc-400">OPERATIONAL</span>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 bg-amber-400 inline-block" />
-            <span className="text-zinc-400">DEGRADED</span>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 bg-rose-500 inline-block" />
-            <span className="text-zinc-400">OUTAGE</span>
-          </span>
+      {!compact && (
+        <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono pt-1 select-none">
+          <span>[ 30 DAYS AGO ]</span>
+          <div className="flex items-center space-x-4 text-[10px]">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 bg-emerald-400 inline-block" />
+              <span className="text-zinc-400">OPERATIONAL</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 bg-amber-400 inline-block" />
+              <span className="text-zinc-400">DEGRADED</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 bg-rose-500 inline-block" />
+              <span className="text-zinc-400">OUTAGE</span>
+            </span>
+          </div>
+          <span>[ TODAY: REAL-TIME ]</span>
         </div>
-        <span>[ TODAY: REAL-TIME ]</span>
-      </div>
+      )}
     </div>
   );
 }

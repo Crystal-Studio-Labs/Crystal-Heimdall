@@ -118,6 +118,7 @@ router.get("/", async (_req: Request, res: Response) => {
         name: svc.name,
         type: svc.type,
         status: svc.status,
+        group_name: svc.group_name || "Production",
         is_public: 1,
         latency_ms: svc.latency_ms,
         uptime_pct: genuineUptimePct,
