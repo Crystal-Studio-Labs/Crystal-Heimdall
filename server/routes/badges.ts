@@ -64,12 +64,15 @@ async function handleProjectGroupBadge(groupParam: string, req: Request, res: Re
   });
   const canonicalName = grpCheck.rows.length > 0 ? (grpCheck.rows[0].name as string) : group;
 
-  // Find all public services in this project group
+  // Find all services in this project group (including legacy/unassigned services under Production)
+  const isProdQuery = canonicalName.toLowerCase() === "production" || group.toLowerCase() === "production";
   const svcRes = await db.execute({
-    sql: `SELECT status, uptime_pct, latency_ms FROM services 
-          WHERE (LOWER(group_name) = LOWER(?) OR LOWER(group_name) = LOWER(?)) 
-          AND (is_public = 1 OR is_public IS NULL)`,
-    args: [group, canonicalName],
+    sql: isProdQuery
+      ? `SELECT status, uptime_pct, latency_ms FROM services 
+         WHERE (LOWER(group_name) = 'production' OR group_name IS NULL OR group_name = '')`
+      : `SELECT status, uptime_pct, latency_ms FROM services 
+         WHERE LOWER(group_name) = LOWER(?) OR LOWER(group_name) = LOWER(?)`,
+    args: isProdQuery ? [] : [group, canonicalName],
   });
 
   const services = svcRes.rows as any[];
@@ -79,8 +82,12 @@ async function handleProjectGroupBadge(groupParam: string, req: Request, res: Re
   if (services.length === 0) {
     if (grpCheck.rows.length === 0) {
       const anySvc = await db.execute({
-        sql: "SELECT count(*) as count FROM services WHERE LOWER(group_name) = LOWER(?) OR LOWER(group_name) = LOWER(?)",
-        args: [group, canonicalName],
+        sql: isProdQuery
+          ? `SELECT count(*) as count FROM services 
+             WHERE (LOWER(group_name) = 'production' OR group_name IS NULL OR group_name = '')`
+          : `SELECT count(*) as count FROM services 
+             WHERE LOWER(group_name) = LOWER(?) OR LOWER(group_name) = LOWER(?)`,
+        args: isProdQuery ? [] : [group, canonicalName],
       });
       if (Number(anySvc.rows[0]?.count || 0) === 0) {
         const svg = renderSvgBadge(label, "PROJECT NOT FOUND", "#71717a", redirectUrl);

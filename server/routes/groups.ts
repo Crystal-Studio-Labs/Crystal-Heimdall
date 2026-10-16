@@ -16,9 +16,13 @@ router.get("/", async (_req: Request, res: Response) => {
     const services = servicesRes.rows as any[];
 
     const enrichedGroups = groups.map((g) => {
-      const gServices = services.filter(
-        (s) => String(s.group_name || "").toLowerCase() === String(g.name).toLowerCase()
-      );
+      const gName = String(g.name || "").trim().toLowerCase();
+      const gServices = services.filter((s) => {
+        const sGroup = String(s.group_name || "").trim().toLowerCase();
+        if (sGroup === gName) return true;
+        if (!sGroup && gName === "production") return true;
+        return false;
+      });
 
       const healthyCount = gServices.filter((s) => s.status === "healthy").length;
       const warningCount = gServices.filter((s) => s.status === "warning").length;

@@ -173,12 +173,79 @@ export default function SettingsPage() {
         setAllServices(list);
         setSelectedBadgeService((prev) => {
           const exists = list.some((s: any) => s.id === prev);
-          return exists ? prev : list[0].id;
+          const nextId = exists ? prev : list[0].id;
+          return nextId;
         });
       }
     } catch (err) {
       console.error("Failed to fetch services for badges", err);
     }
+  };
+
+  // Synchronize badge state whenever active tab changes to badges
+  useEffect(() => {
+    if (activeTab === "badges") {
+      fetchGroups();
+      fetchServicesForBadges();
+    }
+  }, [activeTab]);
+
+  // Keep selectedBadgeService synchronized whenever allServices updates
+  useEffect(() => {
+    if (allServices.length > 0) {
+      const isValid = selectedBadgeService && allServices.some((s) => s.id === selectedBadgeService);
+      if (!isValid) {
+        const firstId = allServices[0].id;
+        setSelectedBadgeService(firstId);
+        if (badgeScope === "service") {
+          setBadgeRedirectUrl(`https://crystal-heimdall.vercel.app/service/${firstId}`);
+        }
+      }
+    }
+  }, [allServices, badgeScope, selectedBadgeService]);
+
+  // Keep selectedBadgeGroup synchronized whenever groups update
+  useEffect(() => {
+    if (groups.length > 0) {
+      const isValid = selectedBadgeGroup && groups.some((g) => g.name === selectedBadgeGroup);
+      if (!isValid) {
+        setSelectedBadgeGroup(groups[0].name);
+      }
+    }
+  }, [groups, selectedBadgeGroup]);
+
+  const handleScopeChange = (newScope: "fleet" | "group" | "service") => {
+    setBadgeScope(newScope);
+    if (newScope === "service") {
+      const activeSvcId = (selectedBadgeService && allServices.some((s) => s.id === selectedBadgeService))
+        ? selectedBadgeService
+        : (allServices[0]?.id || "");
+      if (activeSvcId) {
+        setSelectedBadgeService(activeSvcId);
+        setBadgeRedirectUrl(`https://crystal-heimdall.vercel.app/service/${activeSvcId}`);
+      } else {
+        setBadgeRedirectUrl("https://crystal-heimdall.vercel.app/");
+      }
+    } else if (newScope === "group") {
+      const activeGroup = (selectedBadgeGroup && groups.some((g) => g.name === selectedBadgeGroup))
+        ? selectedBadgeGroup
+        : (groups[0]?.name || "Production");
+      setSelectedBadgeGroup(activeGroup);
+      setBadgeRedirectUrl("https://crystal-heimdall.vercel.app/");
+    } else {
+      setBadgeRedirectUrl("https://crystal-heimdall.vercel.app/");
+    }
+  };
+
+  const handleSelectBadgeService = (svcId: string) => {
+    setSelectedBadgeService(svcId);
+    if (svcId) {
+      setBadgeRedirectUrl(`https://crystal-heimdall.vercel.app/service/${svcId}`);
+    }
+  };
+
+  const handleSelectBadgeGroup = (groupName: string) => {
+    setSelectedBadgeGroup(groupName);
   };
 
   const handleOpenCreateGroup = () => {
@@ -1004,18 +1071,7 @@ export default function SettingsPage() {
                       <button
                         type="button"
                         key={scope.id}
-                        onClick={() => {
-                          const newScope = scope.id as any;
-                          setBadgeScope(newScope);
-                          if (newScope === "service") {
-                            const targetId = selectedBadgeService || (allServices.length > 0 ? allServices[0].id : "");
-                            if (targetId) {
-                              setBadgeRedirectUrl(`https://crystal-heimdall.vercel.app/service/${targetId}`);
-                            }
-                          } else {
-                            setBadgeRedirectUrl("https://crystal-heimdall.vercel.app/");
-                          }
-                        }}
+                        onClick={() => handleScopeChange(scope.id as any)}
                         className={`p-2 text-[10px] font-bold font-mono border transition text-center uppercase ${
                           badgeScope === scope.id
                             ? "bg-cyan-950 border-cyan-400 text-cyan-300"
@@ -1034,15 +1090,19 @@ export default function SettingsPage() {
                         Select Project Group:
                       </label>
                       <select
-                        value={selectedBadgeGroup}
-                        onChange={(e) => setSelectedBadgeGroup(e.target.value)}
+                        value={selectedBadgeGroup || (groups[0]?.name || "Production")}
+                        onChange={(e) => handleSelectBadgeGroup(e.target.value)}
                         className="w-full p-2 bg-zinc-950 border border-zinc-700 text-white font-mono text-xs focus:border-cyan-400 outline-none"
                       >
-                        {groups.map((g) => (
-                          <option key={g.id} value={g.name}>
-                            {g.name} ({g.environment.toUpperCase()} • {g.service_count} services)
-                          </option>
-                        ))}
+                        {groups.length === 0 ? (
+                          <option value="Production">Production (DEFAULT)</option>
+                        ) : (
+                          groups.map((g) => (
+                            <option key={g.id} value={g.name}>
+                              {g.name} ({g.environment.toUpperCase()} • {g.service_count} services)
+                            </option>
+                          ))
+                        )}
                       </select>
                     </div>
                   )}
@@ -1053,12 +1113,8 @@ export default function SettingsPage() {
                         Select Monitored Service:
                       </label>
                       <select
-                        value={selectedBadgeService}
-                        onChange={(e) => {
-                          const svcId = e.target.value;
-                          setSelectedBadgeService(svcId);
-                          setBadgeRedirectUrl(`https://crystal-heimdall.vercel.app/service/${svcId}`);
-                        }}
+                        value={selectedBadgeService || (allServices[0]?.id || "")}
+                        onChange={(e) => handleSelectBadgeService(e.target.value)}
                         className="w-full p-2 bg-zinc-950 border border-zinc-700 text-white font-mono text-xs focus:border-cyan-400 outline-none"
                       >
                         {allServices.length === 0 ? (
@@ -1142,20 +1198,24 @@ export default function SettingsPage() {
               {/* Live Interactive Preview Card */}
               {(() => {
                 const origin = typeof window !== "undefined" ? window.location.origin : "https://crystal-heimdall.vercel.app";
+                const effectiveServiceId = selectedBadgeService || (allServices.length > 0 ? allServices[0].id : "");
+                const effectiveGroupName = selectedBadgeGroup || (groups.length > 0 ? groups[0].name : "Production");
+
                 let path = "/api/v1/badges/fleet/status.svg";
                 if (badgeScope === "group") {
-                  path = `/api/v1/badges/project/${encodeURIComponent(selectedBadgeGroup || "Production")}/status.svg`;
+                  path = `/api/v1/badges/project/${encodeURIComponent(effectiveGroupName)}/status.svg`;
                 } else if (badgeScope === "service") {
-                  const svcId = selectedBadgeService || (allServices.length > 0 ? allServices[0].id : "srv-auth");
-                  path = `/api/v1/badges/service/${encodeURIComponent(svcId)}/status.svg`;
+                  path = effectiveServiceId
+                    ? `/api/v1/badges/service/${encodeURIComponent(effectiveServiceId)}/status.svg`
+                    : "/api/v1/badges/fleet/status.svg";
                 }
 
-                const matchedService = allServices.find((s) => s.id === selectedBadgeService);
+                const matchedService = allServices.find((s) => s.id === effectiveServiceId);
                 const displayLabel = badgeCustomLabel.trim() || (
                   badgeScope === "fleet" 
                     ? "Fleet Status" 
                     : badgeScope === "group" 
-                    ? (selectedBadgeGroup || "Production") 
+                    ? effectiveGroupName 
                     : (matchedService ? matchedService.name : "Service Status")
                 );
 
@@ -1163,8 +1223,8 @@ export default function SettingsPage() {
                 if (badgeMetric !== "status") params.set("metric", badgeMetric);
                 if (badgeCustomLabel.trim()) params.set("label", badgeCustomLabel.trim());
 
-                const defaultRedirect = badgeScope === "service" && (selectedBadgeService || allServices[0]?.id)
-                  ? `https://crystal-heimdall.vercel.app/service/${selectedBadgeService || allServices[0]?.id}`
+                const defaultRedirect = badgeScope === "service" && effectiveServiceId
+                  ? `https://crystal-heimdall.vercel.app/service/${effectiveServiceId}`
                   : "https://crystal-heimdall.vercel.app/";
                 const cleanRedirect = badgeRedirectUrl.trim() || defaultRedirect;
 
@@ -1194,7 +1254,7 @@ export default function SettingsPage() {
                           className="inline-block hover:opacity-90 transition-transform active:scale-95"
                           title={`Click badge to test redirect to ${cleanRedirect}`}
                         >
-                          <img src={badgeSvgUrl} alt={displayLabel} className="h-6" />
+                          <img key={badgeSvgUrl} src={badgeSvgUrl} alt={displayLabel} className="h-6" />
                         </a>
                       </div>
 
