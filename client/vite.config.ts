@@ -21,6 +21,22 @@ export default defineConfig({
         target: "http://localhost:3030",
         changeOrigin: true,
       },
+      "/status/feed.xml": {
+        target: "http://localhost:3030",
+        changeOrigin: true,
+      },
+      "/feed.xml": {
+        target: "http://localhost:3030",
+        changeOrigin: true,
+      },
+      "/sitemap.xml": {
+        target: "http://localhost:3030",
+        changeOrigin: true,
+      },
+      "/robots.txt": {
+        target: "http://localhost:3030",
+        changeOrigin: true,
+      },
     },
   },
 });

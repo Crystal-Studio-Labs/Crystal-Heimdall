@@ -1,5 +1,9 @@
 import { Router, Request, Response } from "express";
-import { sendTelegramAlert, sendDiscordWebhookAlert } from "../dispatcher.js";
+import {
+  sendTelegramAlert,
+  sendDiscordWebhookAlert,
+  sendGenericWebhookAlert,
+} from "../dispatcher.js";
 
 const router = Router();
 
@@ -30,9 +34,20 @@ router.post("/test", async (req: Request, res: Response) => {
         webhookUrl
       );
       return res.json(result);
+    } else if (type === "generic" || type === "webhook") {
+      const result = await sendGenericWebhookAlert(
+        {
+          serviceName: "Heimdall Sentinel",
+          severity: "info",
+          title: "Generic Webhook Relay Verified",
+          message: "Custom webhook endpoint active. Structured JSON alerts will forward here.",
+        },
+        webhookUrl
+      );
+      return res.json(result);
     }
 
-    return res.status(400).json({ error: "Invalid type. Must be 'telegram' or 'discord'." });
+    return res.status(400).json({ error: "Invalid type. Must be 'telegram', 'discord', or 'generic'." });
   } catch (err: any) {
     return res.status(500).json({ error: "Test dispatch failed", details: err.message });
   }

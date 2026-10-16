@@ -105,3 +105,60 @@ export async function sendDiscordWebhookAlert(
     return { success: false, message: err.message || "Failed to deliver Discord webhook" };
   }
 }
+
+export async function sendGenericWebhookAlert(
+  payload: AlertPayload,
+  customWebhookUrl?: string
+): Promise<{ success: boolean; message: string; statusCode?: number }> {
+  const webhookUrl = customWebhookUrl || process.env.GENERIC_WEBHOOK_URL;
+
+  if (!webhookUrl) {
+    return {
+      success: false,
+      message: "Generic Webhook URL not configured (provide URL or set GENERIC_WEBHOOK_URL)",
+    };
+  }
+
+  const standardPayload = {
+    event: "incident_alert",
+    service: payload.serviceName,
+    severity: payload.severity,
+    title: payload.title,
+    message: payload.message || "No contextual details provided.",
+    timestamp: new Date(payload.timestamp || Date.now()).toISOString(),
+    source: "Crystal-Heimdall",
+    text: `🚨 [${payload.severity.toUpperCase()}] ${payload.serviceName}: ${payload.title}\n${payload.message || ""}`,
+  };
+
+  try {
+    const res = await fetch(webhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "Crystal-Heimdall/2.0 (+https://github.com/Crystal-Studio-Labs)",
+      },
+      body: JSON.stringify(standardPayload),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      return {
+        success: false,
+        message: `Generic webhook endpoint returned HTTP ${res.status}: ${errText.substring(0, 100)}`,
+        statusCode: res.status,
+      };
+    }
+
+    return {
+      success: true,
+      message: "Generic webhook delivered successfully.",
+      statusCode: res.status,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || "Failed to deliver generic webhook alert",
+    };
+  }
+}
+
