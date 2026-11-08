@@ -204,20 +204,35 @@ app.all("/api/v1/ping/:key", pingRateLimiter, async (req, res) => {
   }
 });
 
-// Manual / Cron trigger for synthetic poll (Vercel Cron endpoint)
+// In-memory throttle tracker to protect poll cycle from saturation
+let lastPollCycleTime = 0;
+const MIN_PUBLIC_POLL_INTERVAL_MS = 15000; // 15 seconds
+
+// Manual / Cron trigger for synthetic poll (Vercel Cron & External Pingers)
 app.get("/api/v1/cron/poll", async (req, res) => {
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && cronSecret.trim().length > 0 && process.env.NODE_ENV !== "test") {
-    const authHeader = req.headers.authorization;
-    const querySecret = req.query.secret as string | undefined;
-    const isBearerValid = authHeader === `Bearer ${cronSecret.trim()}`;
-    const isQueryValid = querySecret === cronSecret.trim();
-    if (!isBearerValid && !isQueryValid) {
-      return res.status(401).json({ error: "Unauthorized cron trigger" });
-    }
+  const isVercelCron = Boolean(req.headers["x-vercel-cron"]);
+
+  const authHeader = req.headers.authorization;
+  const querySecret = req.query.secret as string | undefined;
+  const isAuthorized =
+    isVercelCron ||
+    (cronSecret && (authHeader === `Bearer ${cronSecret.trim()}` || querySecret === cronSecret.trim()));
+
+  const now = Date.now();
+
+  // If unauthenticated public trigger, enforce a 15-second debounce cooldown to prevent DB saturation
+  if (!isAuthorized && now - lastPollCycleTime < MIN_PUBLIC_POLL_INTERVAL_MS) {
+    return res.status(200).json({
+      status: "throttled",
+      message: "Poll cycle was recently executed. Cooldown active.",
+      cooldownRemainingSec: Math.ceil((MIN_PUBLIC_POLL_INTERVAL_MS - (now - lastPollCycleTime)) / 1000),
+      timestamp: new Date().toISOString(),
+    });
   }
 
   try {
+    lastPollCycleTime = now;
     const result = await runPollCycle();
     return res.json({ timestamp: new Date().toISOString(), summary: result });
   } catch (err: any) {

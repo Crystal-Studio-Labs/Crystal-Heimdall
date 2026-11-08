@@ -14,6 +14,10 @@ jobs:
       - name: "Execute Synthetic Health Checks"
         run: |
           TARGET_URL="${{ secrets.HEIMDALL_APP_URL || 'https://crystal-heimdall.vercel.app' }}"
+          SECRET_PARAM=""
+          if [ -n "${{ secrets.CRON_SECRET }}" ]; then
+            SECRET_PARAM="?secret=${{ secrets.CRON_SECRET }}"
+          fi
           echo "Dispatching synthetic poll cycle to: ${TARGET_URL}/api/v1/cron/poll"
-          RESPONSE=$(curl -s -X GET "${TARGET_URL}/api/v1/cron/poll" || echo '{"error":"Failed to connect"}')
+          RESPONSE=$(curl -s -X GET "${TARGET_URL}/api/v1/cron/poll${SECRET_PARAM}" || echo '{"error":"Failed to connect"}')
           echo "Poll Result: ${RESPONSE}"
