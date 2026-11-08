@@ -6,7 +6,19 @@ import { getDb, initDb } from "../db.js";
 import { createRateLimiter } from "../rateLimiter.js";
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || "crystal_heimdall_super_secret_jwt_key_2026";
+export const JWT_SECRET = process.env.JWT_SECRET || "crystal_heimdall_super_secret_jwt_key_2026";
+
+export function isOperatorReq(req: Request): boolean {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return false;
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  try {
+    jwt.verify(token, JWT_SECRET);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // Rate Limiter: Max 5 attempts per minute per IP to prevent TOTP brute forcing
 const authRateLimiter = createRateLimiter({

@@ -18,9 +18,12 @@ import {
   LogOut,
   Rss,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  BellRing
 } from "lucide-react";
 import HeartbeatBars, { HistoryBlock } from "../components/HeartbeatBars";
+import SubscribeModal from "../components/SubscribeModal";
+import MaintenanceBanner, { MaintenanceItem } from "../components/MaintenanceBanner";
 import { useToast } from "../lib/ToastContext";
 import { isAudioMuted, setAudioMuted, playCriticalAlarm, playTestSound } from "../lib/audioAlerts";
 import { isOperatorAuthenticated, clearAuthToken, getSessionInfo } from "../lib/api";
@@ -80,25 +83,39 @@ export default function StatusPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "healthy" | "warning" | "critical" | "maintenance">("all");
   const [expandedIncidents, setExpandedIncidents] = useState<Record<string, boolean>>({});
+  const [isSubscribeOpen, setIsSubscribeOpen] = useState(false);
+  const [maintenanceWindows, setMaintenanceWindows] = useState<MaintenanceItem[]>([]);
   const prevStatusRef = useRef<string | null>(null);
 
   const fetchStatus = async (): Promise<boolean> => {
     try {
-      const res = await fetch("/api/v1/status");
-      if (res.status === 429) {
-        return false;
-      }
-      if (res.ok) {
-        const json = await res.json();
-        setData(json);
+      const [res, maintRes] = await Promise.allSettled([
+        fetch("/api/v1/status"),
+        fetch("/api/v1/maintenance"),
+      ]);
 
-        // Sound alarm detection
-        if (json.overallStatus === "outage" && prevStatusRef.current && prevStatusRef.current !== "outage") {
-          playCriticalAlarm();
-          toast.error("TELEMETRY ALARM: Service outage detected across monitored targets!");
+      if (maintRes.status === "fulfilled" && maintRes.value.ok) {
+        const mData = await maintRes.value.json();
+        const activeAndUpcoming = [...(mData.active || []), ...(mData.upcoming || [])];
+        setMaintenanceWindows(activeAndUpcoming);
+      }
+
+      if (res.status === "fulfilled") {
+        if (res.value.status === 429) {
+          return false;
         }
-        prevStatusRef.current = json.overallStatus;
-        return true;
+        if (res.value.ok) {
+          const json = await res.value.json();
+          setData(json);
+
+          // Sound alarm detection
+          if (json.overallStatus === "outage" && prevStatusRef.current && prevStatusRef.current !== "outage") {
+            playCriticalAlarm();
+            toast.error("TELEMETRY ALARM: Service outage detected across monitored targets!");
+          }
+          prevStatusRef.current = json.overallStatus;
+          return true;
+        }
       }
       return false;
     } catch (err) {
@@ -254,6 +271,16 @@ export default function StatusPage() {
               <span>AUTO-SYNC ({nextSyncSeconds}s)</span>
             </div>
 
+            {/* Public Subscribe to Updates Button */}
+            <button
+              onClick={() => setIsSubscribeOpen(true)}
+              className="px-2 sm:px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-emerald-500/80 hover:border-emerald-400 text-emerald-300 font-bold transition flex items-center gap-1.5 text-xs shadow-[1px_1px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+              title="Subscribe to instant email and webhook outage alerts"
+            >
+              <BellRing className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">SUBSCRIBE</span>
+            </button>
+
             {/* Operator Session Pill */}
             {isAuthenticated ? (
               <Link
@@ -279,6 +306,9 @@ export default function StatusPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 space-y-6">
+        {/* SCHEDULED & ACTIVE MAINTENANCE BANNERS */}
+        <MaintenanceBanner maintenanceWindows={maintenanceWindows} />
+
         {/* SINGLE HIGH-IMPACT STATUS HERO (UPTIME ROBOT / KUMA STYLE) */}
         <div className={`p-5 sm:p-6 border-2 shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all ${
           isAllGood
@@ -674,6 +704,15 @@ export default function StatusPage() {
 
             <div className="flex items-center space-x-3 text-xs">
               <button
+                onClick={() => setIsSubscribeOpen(true)}
+                className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-bold transition"
+                title="Subscribe to instant outage and recovery alerts"
+              >
+                <Mail className="w-3 h-3" />
+                <span>SUBSCRIBE</span>
+              </button>
+
+              <button
                 onClick={handleShareStatus}
                 className="text-zinc-400 hover:text-white flex items-center gap-1 transition"
               >
@@ -720,6 +759,11 @@ export default function StatusPage() {
           </div>
         </footer>
       </main>
+
+      <SubscribeModal 
+        isOpen={isSubscribeOpen} 
+        onClose={() => setIsSubscribeOpen(false)} 
+      />
     </div>
   );
 }

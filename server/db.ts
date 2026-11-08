@@ -165,6 +165,33 @@ export async function initDb(): Promise<void> {
     );
   `);
 
+  // Incident & Outage Public Subscribers Table
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS subscribers (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      target TEXT NOT NULL,
+      scope TEXT DEFAULT 'all',
+      token TEXT UNIQUE NOT NULL,
+      is_active INTEGER DEFAULT 1,
+      created_at INTEGER NOT NULL
+    );
+  `);
+
+  // Scheduled Maintenance Windows Table
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS maintenance_windows (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      start_time INTEGER NOT NULL,
+      end_time INTEGER NOT NULL,
+      affected_services TEXT,
+      status TEXT DEFAULT 'scheduled',
+      created_at INTEGER NOT NULL
+    );
+  `);
+
   // Migrations: Ensure additional columns exist on services for Uptime Kuma/Robot features
   const alterColumns = [
     "ALTER TABLE services ADD COLUMN is_public INTEGER DEFAULT 1",
@@ -194,6 +221,10 @@ export async function initDb(): Promise<void> {
     "CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents (status)",
     "CREATE INDEX IF NOT EXISTS idx_incidents_svc ON incidents (service_id)",
     "CREATE INDEX IF NOT EXISTS idx_project_groups_name ON project_groups (name)",
+    "CREATE INDEX IF NOT EXISTS idx_subscribers_active ON subscribers (is_active)",
+    "CREATE INDEX IF NOT EXISTS idx_subscribers_token ON subscribers (token)",
+    "CREATE INDEX IF NOT EXISTS idx_maintenance_status ON maintenance_windows (status)",
+    "CREATE INDEX IF NOT EXISTS idx_maintenance_time ON maintenance_windows (start_time, end_time)",
   ];
 
   for (const idxSql of indices) {

@@ -33,9 +33,15 @@ import {
   Edit2,
   RefreshCw,
   FolderPlus,
-  Tag
+  Tag,
+  Mail,
+  Calendar,
+  Download,
+  Sparkles,
+  Radio
 } from "lucide-react";
 import { useToast } from "../lib/ToastContext";
+import { getAuthToken } from "../lib/api";
 
 export interface ProjectGroup {
   id: string;
@@ -83,7 +89,7 @@ interface AdvancedSettings {
 export default function SettingsPage() {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<
-    "status" | "groups" | "badges" | "advanced" | "alerts" | "security"
+    "status" | "groups" | "badges" | "advanced" | "alerts" | "subscribers" | "maintenance" | "widget" | "security"
   >("status");
 
   // Status Page Configuration (Uptime Kuma Style)
@@ -571,6 +577,256 @@ export default function SettingsPage() {
     }
   };
 
+  // --- FEATURE: In-Browser Webhook Conduit & Alert Dispatch Simulator ---
+  const [simScenario, setSimScenario] = useState<"critical" | "warning" | "info">("critical");
+  const [simTarget, setSimTarget] = useState<"discord" | "telegram" | "generic">("generic");
+  const [simServiceName, setSimServiceName] = useState("Crystal Auth Gateway");
+  const [simCustomTitle, setSimCustomTitle] = useState("");
+  const [simCustomMessage, setSimCustomMessage] = useState("");
+  const [simIsRunning, setSimIsRunning] = useState(false);
+  const [simResult, setSimResult] = useState<{
+    success: boolean;
+    message: string;
+    statusCode?: number;
+    latencyMs?: number;
+    simulatedPayload?: any;
+  } | null>(null);
+
+  const handleRunSimulation = async () => {
+    setSimIsRunning(true);
+    setSimResult(null);
+    try {
+      const body: any = {
+        type: simTarget,
+        severity: simScenario,
+        serviceName: simServiceName.trim() || "Crystal Sentinel",
+        title: simCustomTitle.trim() || undefined,
+        message: simCustomMessage.trim() || undefined,
+      };
+
+      if (simTarget === "discord") {
+        if (!discordWebhookUrl.trim()) {
+          toast.error("Please configure a Discord Webhook URL first");
+          setSimIsRunning(false);
+          return;
+        }
+        body.webhookUrl = discordWebhookUrl.trim();
+      } else if (simTarget === "telegram") {
+        if (!telegramToken.trim() || !telegramChatId.trim()) {
+          toast.error("Please configure Telegram Bot Token and Chat ID first");
+          setSimIsRunning(false);
+          return;
+        }
+        body.token = telegramToken.trim();
+        body.chatId = telegramChatId.trim();
+      } else {
+        if (!genericWebhookUrl.trim()) {
+          toast.error("Please configure a Generic Webhook URL first");
+          setSimIsRunning(false);
+          return;
+        }
+        body.webhookUrl = genericWebhookUrl.trim();
+      }
+
+      const res = await fetch("/api/v1/channels/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+      setSimResult(data);
+      if (data.success) {
+        toast.success(`Simulation delivered via ${simTarget.toUpperCase()} in ${data.latencyMs || 0}ms`);
+      } else {
+        toast.error(`Simulation failed: ${data.message || data.error}`);
+      }
+    } catch (err: any) {
+      setSimResult({
+        success: false,
+        message: err.message,
+      });
+      toast.error(err.message);
+    } finally {
+      setSimIsRunning(false);
+    }
+  };
+
+  // --- FEATURE: Subscribers Management ---
+  const [subscribers, setSubscribers] = useState<any[]>([]);
+  const [subscriberStats, setSubscriberStats] = useState({ total: 0, emailCount: 0, webhookCount: 0 });
+  const [isLoadingSubscribers, setIsLoadingSubscribers] = useState(false);
+
+  const fetchSubscribers = async () => {
+    setIsLoadingSubscribers(true);
+    try {
+      const token = getAuthToken();
+      const res = await fetch("/api/v1/subscribers", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSubscribers(data.subscribers || []);
+        setSubscriberStats({
+          total: data.total || 0,
+          emailCount: data.emailCount || 0,
+          webhookCount: data.webhookCount || 0,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoadingSubscribers(false);
+    }
+  };
+
+  const handleDeleteSubscriber = async (id: string) => {
+    if (!confirm("Revoke this subscription? The destination will no longer receive outage alerts.")) return;
+    try {
+      const token = getAuthToken();
+      const res = await fetch(`/api/v1/subscribers/${id}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        toast.success("Subscriber successfully removed");
+        fetchSubscribers();
+      } else {
+        toast.error("Failed to delete subscriber");
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  // --- FEATURE: Scheduled Maintenance Engine ---
+  const [maintenanceWindows, setMaintenanceWindows] = useState<any[]>([]);
+  const [isLoadingMaintenance, setIsLoadingMaintenance] = useState(false);
+  const [isMaintModalOpen, setIsMaintModalOpen] = useState(false);
+  const [maintForm, setMaintForm] = useState({
+    title: "",
+    description: "",
+    startTime: "",
+    endTime: "",
+    affectedServices: [] as string[],
+    status: "scheduled",
+  });
+
+  const fetchMaintenance = async () => {
+    setIsLoadingMaintenance(true);
+    try {
+      const res = await fetch("/api/v1/maintenance?includePast=true");
+      if (res.ok) {
+        const data = await res.json();
+        const combined = [...(data.active || []), ...(data.upcoming || []), ...(data.past || [])];
+        setMaintenanceWindows(combined);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoadingMaintenance(false);
+    }
+  };
+
+  const handleCreateMaintenance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!maintForm.title.trim()) {
+      toast.error("Please enter a maintenance window title");
+      return;
+    }
+    const startMs = new Date(maintForm.startTime).getTime();
+    const endMs = new Date(maintForm.endTime).getTime();
+    if (!startMs || !endMs || endMs <= startMs) {
+      toast.error("End time must be after start time");
+      return;
+    }
+
+    try {
+      const token = getAuthToken();
+      const res = await fetch("/api/v1/maintenance", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          title: maintForm.title.trim(),
+          description: maintForm.description.trim(),
+          startTime: startMs,
+          endTime: endMs,
+          affectedServices: maintForm.affectedServices,
+          status: maintForm.status,
+        }),
+      });
+
+      if (res.ok) {
+        toast.success("Maintenance window scheduled successfully");
+        setIsMaintModalOpen(false);
+        setMaintForm({
+          title: "",
+          description: "",
+          startTime: "",
+          endTime: "",
+          affectedServices: [],
+          status: "scheduled",
+        });
+        fetchMaintenance();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Failed to schedule maintenance window");
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleUpdateMaintenanceStatus = async (id: string, status: string) => {
+    try {
+      const token = getAuthToken();
+      const res = await fetch(`/api/v1/maintenance/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        toast.success(`Maintenance window status updated to ${status.toUpperCase()}`);
+        fetchMaintenance();
+      } else {
+        toast.error("Failed to update maintenance status");
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleDeleteMaintenance = async (id: string) => {
+    if (!confirm("Permanently delete this scheduled maintenance window?")) return;
+    try {
+      const token = getAuthToken();
+      const res = await fetch(`/api/v1/maintenance/${id}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        toast.success("Maintenance window deleted");
+        fetchMaintenance();
+      } else {
+        toast.error("Failed to delete maintenance window");
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  // Initial fetch for subscribers & maintenance when tabs are clicked
+  useEffect(() => {
+    if (activeTab === "subscribers") fetchSubscribers();
+    if (activeTab === "maintenance") fetchMaintenance();
+  }, [activeTab]);
+
 
   return (
     <div className="min-h-screen bg-[#070a0f] text-zinc-100 flex flex-col font-mono relative overflow-hidden pb-24">
@@ -600,14 +856,17 @@ export default function SettingsPage() {
         </div>
 
         {/* TOP TAB CONTROLS (INDUSTRIAL BRUTALIST ROCKER TABS) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-9 gap-2">
           {[
-            { id: "status", label: "[01] STATUS PAGE" },
-            { id: "groups", label: "[02] GROUPS & ENVS" },
-            { id: "badges", label: "[03] SVG BADGES" },
-            { id: "advanced", label: "[04] UPTIME ENGINE" },
+            { id: "status", label: "[01] STATUS" },
+            { id: "groups", label: "[02] GROUPS" },
+            { id: "badges", label: "[03] BADGES" },
+            { id: "advanced", label: "[04] ENGINE" },
             { id: "alerts", label: "[05] DISPATCH" },
-            { id: "security", label: "[06] SECURITY" },
+            { id: "subscribers", label: "[06] SUBSCRIBERS" },
+            { id: "maintenance", label: "[07] MAINTENANCE" },
+            { id: "widget", label: "[08] WIDGET" },
+            { id: "security", label: "[09] SECURITY" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -1850,10 +2109,574 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+
+            {/* IN-BROWSER CONDUIT & PAYLOAD SIMULATOR */}
+            <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-zinc-800 pb-4">
+                <div>
+                  <div className="flex items-center space-x-2 text-xs text-cyan-400 font-bold mb-1">
+                    <Terminal className="w-4 h-4 text-cyan-400" />
+                    <span>[05.B] IN-BROWSER WEBHOOK CONDUIT &amp; ALERT SIMULATOR</span>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-black text-white uppercase">
+                    Diagnostic Incident Payload Simulator
+                  </h3>
+                  <p className="text-xs text-zinc-400 font-sans mt-0.5">
+                    Safely fire simulated incident payloads (Downtime, Latency Spikes, Recovery) against your external channels without triggering fleet alarms or skewing SLA metrics.
+                  </p>
+                </div>
+
+                <div className="px-3 py-1 bg-black border border-zinc-800 text-[10px] text-zinc-400 font-mono shrink-0">
+                  <span>ZERO-IMPACT SANDBOX</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Left Controls */}
+                <div className="space-y-4">
+                  {/* Scenario Rockers */}
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-1.5">
+                      1. SIMULATION SEVERITY &amp; SCENARIO
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: "critical", label: "CRITICAL OUTAGE", color: "bg-rose-950 border-rose-500 text-rose-300" },
+                        { id: "warning", label: "DEGRADED LATENCY", color: "bg-amber-950 border-amber-400 text-amber-300" },
+                        { id: "info", label: "SERVICE RECOVERED", color: "bg-emerald-950 border-emerald-400 text-emerald-300" },
+                      ].map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setSimScenario(s.id as any)}
+                          className={`p-2 text-[10px] font-bold uppercase border transition ${
+                            simScenario === s.id
+                              ? `${s.color} shadow-[2px_2px_0px_#000]`
+                              : "bg-black border-zinc-800 text-zinc-500 hover:text-white"
+                          }`}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Target Conduit */}
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-1.5">
+                      2. TARGET DISPATCH CONDUIT
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: "generic", label: "GENERIC WEBHOOK" },
+                        { id: "discord", label: "DISCORD RELAY" },
+                        { id: "telegram", label: "TELEGRAM BOT" },
+                      ].map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setSimTarget(t.id as any)}
+                          className={`p-2 text-[10px] font-bold uppercase border transition ${
+                            simTarget === t.id
+                              ? "bg-zinc-800 border-cyan-400 text-cyan-300 shadow-[2px_2px_0px_#000]"
+                              : "bg-black border-zinc-800 text-zinc-500 hover:text-white"
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Service Target Name */}
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-1">
+                      3. SIMULATED TARGET NAME
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Crystal Auth Gateway"
+                      value={simServiceName}
+                      onChange={(e) => setSimServiceName(e.target.value)}
+                      className="w-full p-2 bg-black border border-zinc-700 text-xs text-white outline-none focus:border-cyan-400 font-mono"
+                    />
+                  </div>
+
+                  {/* Custom Title & Message */}
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-1">
+                        OPTIONAL TITLE OVERRIDE
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Simulated Synthetic Probe Failure (Leave blank for default)"
+                        value={simCustomTitle}
+                        onChange={(e) => setSimCustomTitle(e.target.value)}
+                        className="w-full p-2 bg-black border border-zinc-700 text-xs text-white outline-none focus:border-cyan-400 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-1">
+                        OPTIONAL DETAILS OVERRIDE
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="Simulation payload dispatched from Crystal Heimdall Command Deck"
+                        value={simCustomMessage}
+                        onChange={(e) => setSimCustomMessage(e.target.value)}
+                        className="w-full p-2 bg-black border border-zinc-700 text-xs text-white outline-none focus:border-cyan-400 font-mono resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Dispatch Action */}
+                  <button
+                    type="button"
+                    onClick={handleRunSimulation}
+                    disabled={simIsRunning}
+                    className="w-full py-2.5 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black font-black uppercase text-xs flex items-center justify-center gap-2 shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{simIsRunning ? "Executing Conduit Simulation..." : "Dispatch Conduit Simulation"}</span>
+                  </button>
+                </div>
+
+                {/* Right Diagnostic Console / Output */}
+                <div className="bg-black border border-zinc-800 p-4 space-y-3 flex flex-col justify-between font-mono text-xs">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                      <span className="text-zinc-500 uppercase font-bold text-[10px]">
+                        // SIMULATOR CONSOLE //
+                      </span>
+                      {simResult && (
+                        <div className="flex items-center gap-2">
+                          <span className={`px-1.5 py-0.2 text-[9px] font-bold uppercase border ${
+                            simResult.success
+                              ? "bg-emerald-950 border-emerald-500 text-emerald-400"
+                              : "bg-rose-950 border-rose-500 text-rose-400"
+                          }`}>
+                            {simResult.success ? "HTTP 200 DELIVERED" : "DELIVERY FAILED"}
+                          </span>
+                          {simResult.latencyMs !== undefined && (
+                            <span className="text-[10px] text-zinc-400">{simResult.latencyMs}ms</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {simResult ? (
+                      <div className="space-y-2">
+                        <p className={`text-xs ${simResult.success ? "text-emerald-400 font-bold" : "text-rose-400"}`}>
+                          {simResult.message}
+                        </p>
+                        {simResult.simulatedPayload && (
+                          <div className="space-y-1">
+                            <span className="text-[10px] text-zinc-500 uppercase block">DISPATCHED PAYLOAD:</span>
+                            <pre className="p-2.5 bg-[#070a0f] border border-zinc-800 text-[10px] text-zinc-300 overflow-x-auto leading-relaxed">
+                              {JSON.stringify(simResult.simulatedPayload, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="py-12 text-center space-y-2">
+                        <Radio className="w-8 h-8 text-zinc-700 mx-auto animate-pulse" />
+                        <p className="text-zinc-500 text-xs">
+                          Simulator idle. Click [Dispatch Conduit Simulation] to test webhook round-trip.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-2 border-t border-zinc-900 text-[10px] text-zinc-600">
+                    Safe testing conduit • No false incidents recorded • No fleet alarm sirens triggered
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         )}
 
-        {/* TAB 6: ACCESS & SECURITY */}
+        
+        {/* TAB 6: SUBSCRIBERS MANAGEMENT */}
+        {activeTab === "subscribers" && (
+          <div className="space-y-6">
+            <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 sm:p-8 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-zinc-800 pb-4">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2 text-xs text-emerald-400 font-bold">
+                    <Mail className="w-4 h-4 text-emerald-400" />
+                    <span>[PUBLIC OUTAGE &amp; INCIDENT SUBSCRIBERS]</span>
+                  </div>
+                  <h2 className="text-base sm:text-lg font-black text-white uppercase">
+                    Incident Notification Subscribers
+                  </h2>
+                  <p className="text-xs text-zinc-400 font-sans">
+                    Monitor and manage external users and engineering teams subscribed to public outage and recovery broadcasts.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={fetchSubscribers}
+                  disabled={isLoadingSubscribers}
+                  className="px-3 py-1.5 bg-zinc-900 border border-zinc-700 hover:border-emerald-400 text-zinc-300 hover:text-white text-xs font-bold uppercase flex items-center gap-1.5 self-start sm:self-auto transition shadow-[1px_1px_0px_#000]"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isLoadingSubscribers ? "animate-spin text-emerald-400" : ""}`} />
+                  <span>Refresh List</span>
+                </button>
+              </div>
+
+              {/* Metric Counters */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 bg-black border border-zinc-800 space-y-1">
+                  <span className="text-[10px] text-zinc-500 uppercase font-bold">ACTIVE SUBSCRIBERS</span>
+                  <div className="text-2xl font-black text-white font-mono">{subscriberStats.total}</div>
+                </div>
+                <div className="p-4 bg-black border border-zinc-800 space-y-1">
+                  <span className="text-[10px] text-emerald-500 uppercase font-bold">EMAIL NOTIFICATIONS</span>
+                  <div className="text-2xl font-black text-emerald-400 font-mono">{subscriberStats.emailCount}</div>
+                </div>
+                <div className="p-4 bg-black border border-zinc-800 space-y-1">
+                  <span className="text-[10px] text-cyan-500 uppercase font-bold">WEBHOOK RELAYS</span>
+                  <div className="text-2xl font-black text-cyan-400 font-mono">{subscriberStats.webhookCount}</div>
+                </div>
+              </div>
+
+              {/* Subscribers Table */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                  Registered Subscriber Conduits ({subscribers.length})
+                </h3>
+
+                {subscribers.length === 0 ? (
+                  <div className="p-8 bg-black border border-zinc-800 text-center space-y-2">
+                    <Mail className="w-8 h-8 text-zinc-600 mx-auto" />
+                    <p className="text-xs text-zinc-400 uppercase font-bold">No subscribers registered yet</p>
+                    <p className="text-[11px] text-zinc-500 font-sans">
+                      Visitors can subscribe directly on the public Status Page via Email or Webhook.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-black border border-zinc-800 divide-y divide-zinc-800/80 overflow-x-auto">
+                    {subscribers.map((sub) => (
+                      <div key={sub.id} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-1.5 py-0.2 text-[9px] font-bold uppercase border ${
+                              sub.type === "email"
+                                ? "bg-emerald-950 border-emerald-500 text-emerald-300"
+                                : "bg-cyan-950 border-cyan-500 text-cyan-300"
+                            }`}>
+                              {sub.type}
+                            </span>
+                            <span className="font-bold text-white truncate max-w-sm sm:max-w-md">
+                              {sub.target}
+                            </span>
+                            <span className="px-1.5 py-0.2 text-[9px] bg-zinc-900 border border-zinc-800 text-zinc-400 uppercase">
+                              Scope: {sub.scope}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-zinc-500 flex items-center gap-3">
+                            <span>ID: {sub.id}</span>
+                            <span>•</span>
+                            <span>Registered: {new Date(sub.createdAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2 shrink-0 self-end sm:self-auto">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSubscriber(sub.id)}
+                            className="px-2.5 py-1 bg-zinc-900 border border-zinc-700 hover:border-rose-500 text-rose-400 hover:text-rose-300 text-[10px] font-bold uppercase flex items-center gap-1 transition"
+                            title="Revoke subscription"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Revoke</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 7: MAINTENANCE PLANNER */}
+        {activeTab === "maintenance" && (
+          <div className="space-y-6">
+            <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 sm:p-8 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-zinc-800 pb-4">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2 text-xs text-amber-400 font-bold">
+                    <Wrench className="w-4 h-4 text-amber-400" />
+                    <span>[SCHEDULED MAINTENANCE ENGINE &amp; CALENDAR]</span>
+                  </div>
+                  <h2 className="text-base sm:text-lg font-black text-white uppercase">
+                    Maintenance Windows &amp; Downtime Planner
+                  </h2>
+                  <p className="text-xs text-zinc-400 font-sans">
+                    Schedule upcoming infrastructure updates, suppress siren alarms during maintenance, and publish iCalendar (.ics) sync feeds for users.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsMaintModalOpen(true)}
+                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-black text-xs font-black uppercase flex items-center gap-1.5 self-start sm:self-auto shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Plan Maintenance Window</span>
+                </button>
+              </div>
+
+              {/* Maintenance Windows List */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                  Configured Maintenance Windows ({maintenanceWindows.length})
+                </h3>
+
+                {maintenanceWindows.length === 0 ? (
+                  <div className="p-8 bg-black border border-zinc-800 text-center space-y-2">
+                    <Calendar className="w-8 h-8 text-zinc-600 mx-auto" />
+                    <p className="text-xs text-zinc-400 uppercase font-bold">No maintenance windows scheduled</p>
+                    <p className="text-[11px] text-zinc-500 font-sans">
+                      Plan maintenance windows in advance to announce updates on the Status Page and auto-suppress alarm sirens.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {maintenanceWindows.map((m) => {
+                      const isActive = m.status === "in_progress";
+                      const isUpcoming = m.status === "scheduled";
+
+                      return (
+                        <div
+                          key={m.id}
+                          className={`p-4 border-2 shadow-[2px_2px_0px_#000] space-y-3 text-xs ${
+                            isActive
+                              ? "bg-[#181308] border-amber-500"
+                              : isUpcoming
+                              ? "bg-[#0b141d] border-sky-500"
+                              : "bg-black border-zinc-800 opacity-75"
+                          }`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800/80 pb-2">
+                            <div className="flex items-center space-x-2">
+                              <span className={`px-2 py-0.5 text-[9px] font-black uppercase border ${
+                                isActive
+                                  ? "bg-amber-950 border-amber-400 text-amber-300"
+                                  : isUpcoming
+                                  ? "bg-sky-950 border-sky-400 text-sky-300"
+                                  : "bg-zinc-900 border-zinc-700 text-zinc-400"
+                              }`}>
+                                {m.status}
+                              </span>
+                              <h4 className="font-bold text-white uppercase text-xs sm:text-sm">{m.title}</h4>
+                            </div>
+
+                            <div className="flex items-center space-x-2 self-end sm:self-auto">
+                              <a
+                                href={`/api/v1/maintenance/${m.id}/ics`}
+                                download
+                                className="px-2 py-1 bg-zinc-900 border border-zinc-700 hover:border-zinc-500 text-zinc-300 text-[10px] font-bold uppercase flex items-center gap-1"
+                                title="Download RFC 5545 iCalendar (.ics)"
+                              >
+                                <Download className="w-3 h-3" />
+                                <span>.ICS</span>
+                              </a>
+
+                              {isActive && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateMaintenanceStatus(m.id, "completed")}
+                                  className="px-2 py-1 bg-emerald-950 border border-emerald-500 text-emerald-300 hover:bg-emerald-900 text-[10px] font-bold uppercase"
+                                >
+                                  Complete Window
+                                </button>
+                              )}
+
+                              {isUpcoming && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateMaintenanceStatus(m.id, "in_progress")}
+                                  className="px-2 py-1 bg-amber-950 border border-amber-500 text-amber-300 hover:bg-amber-900 text-[10px] font-bold uppercase"
+                                >
+                                  Start Window Now
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMaintenance(m.id)}
+                                className="p-1 text-zinc-500 hover:text-rose-400 transition"
+                                title="Delete maintenance window"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {m.description && (
+                            <p className="text-zinc-300 font-sans text-xs leading-relaxed">
+                              {m.description}
+                            </p>
+                          )}
+
+                          <div className="flex flex-wrap items-center gap-4 text-[11px] text-zinc-400 font-mono">
+                            <div>
+                              <span className="text-zinc-500">WINDOW: </span>
+                              <span className="text-white font-bold">{new Date(m.startTime).toLocaleString()} &rarr; {new Date(m.endTime).toLocaleString()}</span>
+                            </div>
+                            {m.affectedServices && m.affectedServices.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-zinc-500">TARGETS:</span>
+                                {m.affectedServices.map((svc: string) => (
+                                  <span key={svc} className="px-1.5 py-0.2 bg-black border border-zinc-700 text-zinc-300 text-[9px]">
+                                    {svc}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 8: EMBEDDABLE WIDGET & SNIPPETS */}
+        {activeTab === "widget" && (
+          <div className="space-y-6">
+            <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 sm:p-8 space-y-6">
+              <div className="space-y-1 border-b-2 border-zinc-800 pb-4">
+                <div className="flex items-center space-x-2 text-xs text-sky-400 font-bold">
+                  <Sparkles className="w-4 h-4 text-sky-400" />
+                  <span>[EMBEDDABLE MINI STATUS WIDGET &amp; SHIELDS]</span>
+                </div>
+                <h2 className="text-base sm:text-lg font-black text-white uppercase">
+                  Floating Status Widget &amp; Embed Codes
+                </h2>
+                <p className="text-xs text-zinc-400 font-sans">
+                  Integrate live uptime indicators directly into your product footers, dev docs, or organization portals (e.g. KrishiSetu, Campus Relay).
+                </p>
+              </div>
+
+              {/* Widget Previews */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Format 1: Compact Pill */}
+                <div className="bg-black border-2 border-zinc-800 p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white uppercase">// COMPACT PILL EMBED //</span>
+                    <span className="text-[10px] text-zinc-500 font-mono">220px × 34px</span>
+                  </div>
+
+                  <div className="p-4 bg-[#070a0f] border border-zinc-800 flex items-center justify-center">
+                    <iframe
+                      src="/status/widget?compact=true"
+                      width="220"
+                      height="34"
+                      title="Compact Status Pill Preview"
+                      style={{ border: "none", overflow: "hidden" }}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] text-zinc-400">
+                      <span>HTML IFRAME CODE</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`<iframe src="${window.location.origin}/status/widget?compact=true" width="220" height="34" frameborder="0" scrolling="no"></iframe>`);
+                          toast.success("Compact snippet copied!");
+                        }}
+                        className="text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>COPY</span>
+                      </button>
+                    </div>
+                    <pre className="p-2.5 bg-[#0b0f17] border border-zinc-800 text-[10px] text-zinc-300 overflow-x-auto">
+                      {`<iframe src="${window.location.origin}/status/widget?compact=true" width="220" height="34" frameborder="0" scrolling="no"></iframe>`}
+                    </pre>
+                  </div>
+                </div>
+
+                {/* Format 2: Brutalist Card */}
+                <div className="bg-black border-2 border-zinc-800 p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white uppercase">// FULL BRUTALIST CARD //</span>
+                    <span className="text-[10px] text-zinc-500 font-mono">320px × 74px</span>
+                  </div>
+
+                  <div className="p-4 bg-[#070a0f] border border-zinc-800 flex items-center justify-center">
+                    <iframe
+                      src="/status/widget"
+                      width="320"
+                      height="74"
+                      title="Full Status Card Preview"
+                      style={{ border: "none", overflow: "hidden" }}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] text-zinc-400">
+                      <span>HTML IFRAME CODE</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`<iframe src="${window.location.origin}/status/widget" width="320" height="74" frameborder="0" scrolling="no"></iframe>`);
+                          toast.success("Card snippet copied!");
+                        }}
+                        className="text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>COPY</span>
+                      </button>
+                    </div>
+                    <pre className="p-2.5 bg-[#0b0f17] border border-zinc-800 text-[10px] text-zinc-300 overflow-x-auto">
+                      {`<iframe src="${window.location.origin}/status/widget" width="320" height="74" frameborder="0" scrolling="no"></iframe>`}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+
+              {/* Markdown & React Embed Snippets */}
+              <div className="bg-black border-2 border-zinc-800 p-5 space-y-4">
+                <span className="text-xs font-bold text-white uppercase">// REPO README &amp; GITHUB SHIELDS //</span>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-[10px] text-zinc-400">
+                    <span>GITHUB / MARKDOWN BADGE</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`[![Crystal Heimdall Status](${window.location.origin}/api/v1/badges/status)](${window.location.origin}/)`);
+                        toast.success("Markdown badge snippet copied!");
+                      }}
+                      className="text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>COPY</span>
+                    </button>
+                  </div>
+                  <pre className="p-2.5 bg-[#0b0f17] border border-zinc-800 text-[10px] text-zinc-300 overflow-x-auto">
+                    {`[![Crystal Heimdall Status](${window.location.origin}/api/v1/badges/status)](${window.location.origin}/)`}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 9: ACCESS & SECURITY */}
         {activeTab === "security" && (
           <div className="bg-[#0b0f17] border-2 border-emerald-500/50 shadow-[4px_4px_0px_#000] p-6 sm:p-8 space-y-4">
             <div className="flex items-center space-x-3">
@@ -2011,6 +2834,140 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+      
+        {/* SCHEDULE MAINTENANCE WINDOW MODAL */}
+        {isMaintModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 font-mono text-xs overflow-y-auto"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setIsMaintModalOpen(false);
+            }}
+          >
+            <div className="bg-[#0b0f17] border-2 border-amber-500 shadow-[6px_6px_0px_#f59e0b] max-w-lg w-full p-6 space-y-5 relative">
+              <div className="flex items-center justify-between border-b-2 border-zinc-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 bg-amber-950 border border-amber-400 flex items-center justify-center text-amber-400 font-bold">
+                    <Wrench className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-black text-sm uppercase text-white">
+                    // PLAN MAINTENANCE WINDOW //
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsMaintModalOpen(false)}
+                  className="p-1 bg-zinc-900 border border-zinc-700 text-zinc-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateMaintenance} className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-1">
+                    WINDOW TITLE *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. LibSQL Cluster Upgrade & Storage Migration"
+                    value={maintForm.title}
+                    onChange={(e) => setMaintForm({ ...maintForm, title: e.target.value })}
+                    className="w-full p-2 bg-black border border-zinc-700 text-white text-xs outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-1">
+                    CONTEXTUAL DESCRIPTION
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Brief description of the maintenance activity visible to visitors"
+                    value={maintForm.description}
+                    onChange={(e) => setMaintForm({ ...maintForm, description: e.target.value })}
+                    className="w-full p-2 bg-black border border-zinc-700 text-white text-xs outline-none focus:border-amber-400 resize-none font-sans"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-1">
+                      START DATE &amp; TIME *
+                    </label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={maintForm.startTime}
+                      onChange={(e) => setMaintForm({ ...maintForm, startTime: e.target.value })}
+                      className="w-full p-2 bg-black border border-zinc-700 text-white text-xs outline-none focus:border-amber-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-1">
+                      END DATE &amp; TIME *
+                    </label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={maintForm.endTime}
+                      onChange={(e) => setMaintForm({ ...maintForm, endTime: e.target.value })}
+                      className="w-full p-2 bg-black border border-zinc-700 text-white text-xs outline-none focus:border-amber-400"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase block mb-1">
+                    INITIAL WINDOW STATUS
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMaintForm({ ...maintForm, status: "scheduled" })}
+                      className={`p-2 border text-[11px] font-bold uppercase transition ${
+                        maintForm.status === "scheduled"
+                          ? "bg-sky-950 border-sky-400 text-sky-300"
+                          : "bg-black border-zinc-800 text-zinc-500"
+                      }`}
+                    >
+                      SCHEDULED
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMaintForm({ ...maintForm, status: "in_progress" })}
+                      className={`p-2 border text-[11px] font-bold uppercase transition ${
+                        maintForm.status === "in_progress"
+                          ? "bg-amber-950 border-amber-400 text-amber-300"
+                          : "bg-black border-zinc-800 text-zinc-500"
+                      }`}
+                    >
+                      IN PROGRESS NOW
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end space-x-2 border-t border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => setIsMaintModalOpen(false)}
+                    className="px-3 py-2 bg-zinc-900 border border-zinc-700 text-zinc-300 text-xs font-bold uppercase"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black text-xs font-black uppercase flex items-center gap-1.5 shadow-[2px_2px_0px_#000]"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Save Window</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
       </main>
     </div>
   );

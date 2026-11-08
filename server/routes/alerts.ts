@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { getDb, initDb } from "../db.js";
 import { checkAndRegisterAlert } from "../deduplicator.js";
 import { sendTelegramAlert, sendDiscordWebhookAlert } from "../dispatcher.js";
+import { notifySubscribers } from "./subscribers.js";
 
 const router = Router();
 
@@ -103,6 +104,14 @@ router.post("/", async (req: Request, res: Response) => {
         title: cleanTitle,
         message,
         timestamp: now,
+      }),
+      notifySubscribers({
+        id: incId,
+        serviceName: service.name,
+        severity,
+        title: cleanTitle,
+        message,
+        status: "active",
       }),
     ]);
 

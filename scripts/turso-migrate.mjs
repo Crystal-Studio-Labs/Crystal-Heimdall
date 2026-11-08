@@ -194,7 +194,34 @@ async function runMigration() {
         created_at INTEGER NOT NULL
       );
     `);
-    console.log("   ✅ 8 core database tables verified nominal.");
+
+    // Incident & Outage Public Subscribers Table
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS subscribers (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        target TEXT NOT NULL,
+        scope TEXT DEFAULT 'all',
+        token TEXT UNIQUE NOT NULL,
+        is_active INTEGER DEFAULT 1,
+        created_at INTEGER NOT NULL
+      );
+    `);
+
+    // Scheduled Maintenance Windows Table
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS maintenance_windows (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        start_time INTEGER NOT NULL,
+        end_time INTEGER NOT NULL,
+        affected_services TEXT,
+        status TEXT DEFAULT 'scheduled',
+        created_at INTEGER NOT NULL
+      );
+    `);
+    console.log("   ✅ 10 core database tables verified nominal.");
 
     console.log("⚙️  [2/4] Applying Schema Migrations & Alterations...");
     const alterColumns = [
@@ -231,6 +258,10 @@ async function runMigration() {
       "CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents (status)",
       "CREATE INDEX IF NOT EXISTS idx_incidents_svc ON incidents (service_id)",
       "CREATE INDEX IF NOT EXISTS idx_project_groups_name ON project_groups (name)",
+      "CREATE INDEX IF NOT EXISTS idx_subscribers_active ON subscribers (is_active)",
+      "CREATE INDEX IF NOT EXISTS idx_subscribers_token ON subscribers (token)",
+      "CREATE INDEX IF NOT EXISTS idx_maintenance_status ON maintenance_windows (status)",
+      "CREATE INDEX IF NOT EXISTS idx_maintenance_time ON maintenance_windows (start_time, end_time)",
     ];
 
     for (const idxSql of indices) {
@@ -240,7 +271,7 @@ async function runMigration() {
         // Index exists
       }
     }
-    console.log("   ✅ 8 composite & single-column indices verified nominal.");
+    console.log("   ✅ 12 composite & single-column indices verified nominal.");
 
     console.log("⚙️  [4/4] Synchronizing System Presets & Canonical Groups...");
     const now = Date.now();

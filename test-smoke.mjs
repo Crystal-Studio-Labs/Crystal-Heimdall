@@ -22,6 +22,7 @@ async function runSmokeTests() {
   }
 
   try {
+  let operatorToken = "";
 
   // 1. Static Client Serving
   console.log("1. TEST PRODUCTION SPA SERVING (/)");
@@ -179,6 +180,7 @@ async function runSmokeTests() {
   if (!loginData.token) {
     throw new Error(`2FA Direct Login failed with real TOTP code: ${JSON.stringify(loginData)}`);
   }
+  operatorToken = loginData.token;
   console.log("   ✅ Direct 2FA: Real TOTP code verified, operator session token granted.");
 
   // 8c. Verify 2FA Lockdown: unauthenticated requests to /setup-2fa MUST be rejected with 403 Forbidden
@@ -954,7 +956,193 @@ async function runSmokeTests() {
   });
   console.log("   ✅ Display toggles restored to nominal defaults (true).");
 
-  console.log("\n🎉 ALL 29 COMPREHENSIVE VERIFICATION TESTS PASSED NOMINAL! 🎉");
+  
+  // 30. TEST PUBLIC INCIDENT & OUTAGE SUBSCRIBERS (/api/v1/subscribers)
+  console.log("\n30. TEST PUBLIC INCIDENT & OUTAGE SUBSCRIBERS (/api/v1/subscribers)");
+  // 30a. Register email subscriber
+  const testEmail = `devops-${Date.now().toString(36)}@crystalstudiolabs.org`;
+  const subEmailRes = await fetch(`${BASE_URL}/api/v1/subscribers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      type: "email",
+      target: testEmail,
+      scope: "all",
+    }),
+  });
+  const subEmailData = await subEmailRes.json();
+  if (!subEmailRes.ok || subEmailData.status !== "subscribed" || !subEmailData.token) {
+    throw new Error(`Email subscriber registration failed: ${JSON.stringify(subEmailData)}`);
+  }
+  console.log(`   ✅ Email subscriber registered: ID=${subEmailData.id}, Target=${subEmailData.target}`);
+
+  // 30b. Duplicate registration idempotency
+  const dupSubRes = await fetch(`${BASE_URL}/api/v1/subscribers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      type: "email",
+      target: testEmail,
+    }),
+  });
+  const dupSubData = await dupSubRes.json();
+  if (!dupSubRes.ok || !dupSubData.alreadySubscribed) {
+    throw new Error(`Duplicate subscriber check failed: ${JSON.stringify(dupSubData)}`);
+  }
+  console.log("   ✅ Duplicate subscriber idempotency verified.");
+
+  // 30c. Register webhook subscriber
+  const subWebhookRes = await fetch(`${BASE_URL}/api/v1/subscribers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      type: "webhook",
+      target: "https://discord.com/api/webhooks/sentinel-test-channel",
+      scope: "critical",
+    }),
+  });
+  const subWebhookData = await subWebhookRes.json();
+  if (!subWebhookRes.ok || subWebhookData.status !== "subscribed") {
+    throw new Error(`Webhook subscriber registration failed: ${JSON.stringify(subWebhookData)}`);
+  }
+  console.log(`   ✅ Webhook subscriber registered: ID=${subWebhookData.id}`);
+
+  // 30d. Operator list subscribers (Authenticated)
+  const listSubsRes = await fetch(`${BASE_URL}/api/v1/subscribers`, {
+    headers: { Authorization: `Bearer ${operatorToken}` },
+  });
+  const listSubsData = await listSubsRes.json();
+  if (!listSubsRes.ok || typeof listSubsData.total !== "number" || listSubsData.total < 2) {
+    throw new Error(`Operator list subscribers failed: ${JSON.stringify(listSubsData)}`);
+  }
+  console.log(`   ✅ Operator subscriber index verified: ${listSubsData.total} total (${listSubsData.emailCount} email, ${listSubsData.webhookCount} webhook).`);
+
+  // 30e. 1-Click Unsubscribe via Token
+  const unsubRes = await fetch(`${BASE_URL}/api/v1/subscribers/${subEmailData.id}?token=${subEmailData.token}`, {
+    method: "DELETE",
+  });
+  const unsubData = await unsubRes.json();
+  if (!unsubRes.ok || unsubData.status !== "unsubscribed") {
+    throw new Error(`1-click unsubscription failed: ${JSON.stringify(unsubData)}`);
+  }
+  console.log("   ✅ 1-Click unsubscription conduit verified via token.");
+
+  // 31. TEST SCHEDULED MAINTENANCE WINDOWS & ICALENDAR EXPORT (/api/v1/maintenance)
+  console.log("\n31. TEST SCHEDULED MAINTENANCE WINDOWS & ICALENDAR EXPORT (/api/v1/maintenance)");
+  const maintStart = Date.now() + 3600 * 1000;
+  const maintEnd = maintStart + 2 * 3600 * 1000;
+  const createMaintRes = await fetch(`${BASE_URL}/api/v1/maintenance`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${operatorToken}`,
+    },
+    body: JSON.stringify({
+      title: "LibSQL Primary Storage Cluster Rebalance",
+      description: "Performing routine compaction and storage rebalance on remote replica nodes.",
+      startTime: maintStart,
+      endTime: maintEnd,
+      affectedServices: ["srv-auth", "srv-api"],
+      status: "scheduled",
+    }),
+  });
+  const createMaintData = await createMaintRes.json();
+  if (!createMaintRes.ok || createMaintData.status !== "created" || !createMaintData.maintenance?.id) {
+    throw new Error(`Maintenance window creation failed: ${JSON.stringify(createMaintData)}`);
+  }
+  const maintId = createMaintData.maintenance.id;
+  console.log(`   ✅ Maintenance window created: ID=${maintId}, Title='${createMaintData.maintenance.title}'`);
+
+  // 31b. Public retrieval
+  const listMaintRes = await fetch(`${BASE_URL}/api/v1/maintenance`);
+  const listMaintData = await listMaintRes.json();
+  if (!listMaintRes.ok || !Array.isArray(listMaintData.upcoming)) {
+    throw new Error(`Public maintenance list failed: ${JSON.stringify(listMaintData)}`);
+  }
+  const foundMaint = listMaintData.upcoming.find((m) => m.id === maintId);
+  if (!foundMaint) {
+    throw new Error("Created maintenance window not present in public upcoming feed!");
+  }
+  console.log("   ✅ Public maintenance windows feed verified.");
+
+  // 31c. RFC 5545 iCalendar (.ics) export
+  const icsRes = await fetch(`${BASE_URL}/api/v1/maintenance/${maintId}/ics`);
+  const icsText = await icsRes.text();
+  const contentType = icsRes.headers.get("content-type") || "";
+  if (!icsRes.ok || !contentType.includes("text/calendar") || !icsText.includes("BEGIN:VCALENDAR") || !icsText.includes("LibSQL Primary Storage Cluster Rebalance")) {
+    throw new Error(`RFC 5545 iCalendar download verification failed! Content-Type: ${contentType}`);
+  }
+  console.log("   ✅ RFC 5545 iCalendar (.ics) export verified with valid VEVENT calendar headers.");
+
+  // 31d. Update status to in_progress
+  const patchMaintRes = await fetch(`${BASE_URL}/api/v1/maintenance/${maintId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${operatorToken}`,
+    },
+    body: JSON.stringify({ status: "in_progress" }),
+  });
+  const patchMaintData = await patchMaintRes.json();
+  if (!patchMaintRes.ok || patchMaintData.maintenance.status !== "in_progress") {
+    throw new Error(`Failed to update maintenance status: ${JSON.stringify(patchMaintData)}`);
+  }
+  console.log("   ✅ Maintenance window status transitioned to 'in_progress'.");
+
+  // 31e. Clean up test window
+  const delMaintRes = await fetch(`${BASE_URL}/api/v1/maintenance/${maintId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${operatorToken}` },
+  });
+  if (!delMaintRes.ok) {
+    throw new Error("Failed to delete test maintenance window");
+  }
+  console.log(`   ✅ Test maintenance window ${maintId} cleaned up.`);
+
+  // 32. TEST IN-BROWSER CONDUIT SIMULATOR (/api/v1/channels/test)
+  console.log("\n32. TEST IN-BROWSER CONDUIT SIMULATOR (/api/v1/channels/test)");
+  const simRes = await fetch(`${BASE_URL}/api/v1/channels/test`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      type: "generic",
+      webhookUrl: "https://httpbin.org/status/200",
+      severity: "critical",
+      serviceName: "Crystal Studio Labs Edge API",
+      title: "Simulated P99 Latency Breach",
+      message: "Testing simulated alert relay pipeline from Settings Command Deck.",
+    }),
+  });
+  const simData = await simRes.json();
+  if (!simRes.ok || typeof simData.latencyMs !== "number" || !simData.simulatedPayload) {
+    throw new Error(`Conduit simulation failed: ${JSON.stringify(simData)}`);
+  }
+  console.log(`   ✅ In-Browser Conduit Simulator verified: Severity='${simData.simulatedPayload.severity}', Latency=${simData.latencyMs}ms, Delivered=${simData.success}`);
+
+  // 33. TEST EMBEDDABLE MINI STATUS WIDGET & PILL (/status/widget)
+  console.log("\n33. TEST EMBEDDABLE MINI STATUS WIDGET & PILL (/status/widget)");
+  // 33a. Compact Pill
+  const pillRes = await fetch(`${BASE_URL}/status/widget?compact=true`);
+  const pillHtml = await pillRes.text();
+  const pillFrameHeader = pillRes.headers.get("x-frame-options");
+  if (!pillRes.ok || !pillHtml.includes("Crystal Heimdall Status Pill") || !pillHtml.includes("class=\"pill\"")) {
+    throw new Error("Compact widget endpoint failed to serve valid HTML!");
+  }
+  if (pillFrameHeader === "DENY") {
+    throw new Error("Widget endpoint is blocked from framing (X-Frame-Options: DENY)!");
+  }
+  console.log("   ✅ Embeddable compact status pill verified with frame embedding allowed.");
+
+  // 33b. Full Brutalist Card Widget
+  const cardRes = await fetch(`${BASE_URL}/status/widget`);
+  const cardHtml = await cardRes.text();
+  if (!cardRes.ok || !cardHtml.includes("CRYSTAL HEIMDALL SENTINEL") || !cardHtml.includes("class=\"widget-card\"")) {
+    throw new Error("Full card widget endpoint failed to serve valid HTML!");
+  }
+  console.log("   ✅ Embeddable brutalist status card verified with live SLA and monitored count.");
+
+  console.log("\n🎉 ALL 33 COMPREHENSIVE VERIFICATION TESTS PASSED NOMINAL! 🎉");
+
   } finally {
     if (serverInstance) {
       console.log("\n🧹 Closing temporary test server instance...");

@@ -2,6 +2,8 @@ import { getDb, initDb } from "./db.js";
 import { checkAndRegisterAlert } from "./deduplicator.js";
 import { sendTelegramAlert, sendDiscordWebhookAlert } from "./dispatcher.js";
 import { checkTcpPort, checkSslExpiry, parseTargetAddress } from "./probers.js";
+import { notifySubscribers } from "./routes/subscribers.js";
+import { isTargetInMaintenance } from "./routes/maintenance.js";
 
 export interface PollResult {
   polledCount: number;
@@ -119,6 +121,15 @@ async function handleTargetEvaluation(
           message: `Target ${svc.name} (${svc.endpoint || `port ${svc.port}`}) is unreachable (${errorMessage}).`,
           timestamp: now,
         });
+
+        await notifySubscribers({
+          id: incId,
+          serviceName: svc.name,
+          severity: "critical",
+          title,
+          message: `Target ${svc.name} (${svc.endpoint || `port ${svc.port}`}) is unreachable (${errorMessage}).`,
+          status: "active",
+        });
       }
     }
 
@@ -149,8 +160,15 @@ export async function runPollCycle(): Promise<PollResult> {
   };
 
   for (const svc of services) {
-    // 1. If target is in maintenance mode, skip alerting
-    if (svc.is_maintenance === 1) {
+    // 1. If target is in maintenance mode or within an active scheduled window, skip alerting
+    const inScheduledMaint = await isTargetInMaintenance(svc.id, svc.name);
+    if (svc.is_maintenance === 1 || inScheduledMaint) {
+      if (svc.status !== "maintenance") {
+        await db.execute({
+          sql: "UPDATE services SET status = 'maintenance' WHERE id = ?",
+          args: [svc.id],
+        });
+      }
       result.details.push({
         serviceId: svc.id,
         name: svc.name,

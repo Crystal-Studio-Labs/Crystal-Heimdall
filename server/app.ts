@@ -18,9 +18,12 @@ const app = express();
 app.disable("x-powered-by");
 
 // Security Headers & Defense In Depth Middleware
-app.use((_req, res, next) => {
+app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
+  // Allow framing for the embeddable status widget, deny for administrative and status pages
+  if (!req.path.includes("/widget") && !req.path.includes("/embed")) {
+    res.setHeader("X-Frame-Options", "DENY");
+  }
   res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
@@ -67,6 +70,9 @@ import channelsRoutes from "./routes/channels.js";
 import telemetryRoutes from "./routes/telemetry.js";
 import badgesRoutes from "./routes/badges.js";
 import groupsRoutes from "./routes/groups.js";
+import subscribersRoutes from "./routes/subscribers.js";
+import maintenanceRoutes from "./routes/maintenance.js";
+import widgetRoutes from "./routes/widget.js";
 import { getRssFeedHandler } from "./routes/status.js";
 
 // Root API Health Endpoint
@@ -92,6 +98,9 @@ app.get([
 ], getRssFeedHandler);
 
 // Mount API Routes
+app.use(["/status/widget", "/api/v1/status/widget", "/widget"], widgetRoutes);
+app.use(["/api/v1/subscribers", "/subscribers"], subscribersRoutes);
+app.use(["/api/v1/maintenance", "/maintenance"], maintenanceRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/services", servicesRoutes);
 app.use("/api/v1/groups", groupsRoutes);
