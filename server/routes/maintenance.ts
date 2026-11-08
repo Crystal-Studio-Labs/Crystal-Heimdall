@@ -57,6 +57,7 @@ router.get("/", async (req: Request, res: Response) => {
     const upcoming = parsed.filter((m) => m.status === "scheduled" && m.startTime > now);
     const past = parsed.filter((m) => m.status === "completed" || m.endTime < now);
 
+    res.setHeader("Cache-Control", "public, s-maxage=15, stale-while-revalidate=45");
     return res.json({
       active,
       upcoming,

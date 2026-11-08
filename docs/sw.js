@@ -1,5 +1,5 @@
-// Crystal Heimdall Sentinel Service Worker (v5 Circle Icons)
-const CACHE_NAME = "crystal-uptime-v5-circle-icons";
+// Crystal Heimdall Sentinel Service Worker (v6 Instant Sync)
+const CACHE_NAME = "crystal-uptime-v6-instant-sync";
 const STATIC_ASSETS = [
   "/",
   "/index.html",

@@ -82,6 +82,7 @@ router.get("/", statusRateLimiter, async (_req: Request, res: Response) => {
   try {
     const now = Date.now();
     if (statusCache && now - statusCache.cachedAt < STATUS_CACHE_TTL_MS) {
+      res.setHeader("Cache-Control", "public, s-maxage=10, stale-while-revalidate=30");
       res.setHeader("X-Cache", "HIT");
       res.setHeader("X-Cache-TTL", Math.round((STATUS_CACHE_TTL_MS - (now - statusCache.cachedAt)) / 1000));
       return res.json(statusCache.data);
@@ -275,6 +276,7 @@ router.get("/", statusRateLimiter, async (_req: Request, res: Response) => {
       settings,
     };
     statusCache = { data: payload, cachedAt: now };
+    res.setHeader("Cache-Control", "public, s-maxage=10, stale-while-revalidate=30");
     res.setHeader("X-Cache", "MISS");
     return res.json(payload);
   } catch (err: any) {

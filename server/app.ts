@@ -50,7 +50,10 @@ const pingRateLimiter = createRateLimiter({
 });
 
 // Ensure database tables exist (Cold-start safety for serverless)
-app.use(async (_req, _res, next) => {
+app.use(async (req, _res, next) => {
+  if (req.path === "/api/health" || req.path === "/api" || req.path.startsWith("/badges")) {
+    return next();
+  }
   try {
     await initDb();
     next();

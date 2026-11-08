@@ -77,28 +77,62 @@ export default function StatusPage() {
     services: PublicService[];
     recentIncidents: IncidentNotice[];
     settings?: StatusPageSettings;
-  } | null>(null);
+  } | null>(() => {
+    try {
+      const cached = localStorage.getItem("heimdall_status_cache");
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch {
+      // Ignore cache parse error
+    }
+    return null;
+  });
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => {
+    try {
+      const cached = localStorage.getItem("heimdall_status_cache");
+      return !cached;
+    } catch {
+      return true;
+    }
+  });
   const [nextSyncSeconds, setNextSyncSeconds] = useState(30);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "healthy" | "warning" | "critical" | "maintenance">("all");
   const [expandedIncidents, setExpandedIncidents] = useState<Record<string, boolean>>({});
   const [isSubscribeOpen, setIsSubscribeOpen] = useState(false);
-  const [maintenanceWindows, setMaintenanceWindows] = useState<MaintenanceItem[]>([]);
+  const [maintenanceWindows, setMaintenanceWindows] = useState<MaintenanceItem[]>(() => {
+    try {
+      const cached = localStorage.getItem("heimdall_maintenance_cache");
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch {
+      // Ignore
+    }
+    return [];
+  });
   const prevStatusRef = useRef<string | null>(null);
 
   const fetchStatus = async (): Promise<boolean> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     try {
       const [res, maintRes] = await Promise.allSettled([
-        fetch("/api/v1/status"),
-        fetch("/api/v1/maintenance"),
+        fetch("/api/v1/status", { signal: controller.signal }),
+        fetch("/api/v1/maintenance", { signal: controller.signal }),
       ]);
+      clearTimeout(timeoutId);
 
       if (maintRes.status === "fulfilled" && maintRes.value.ok) {
         const mData = await maintRes.value.json();
         const activeAndUpcoming = [...(mData.active || []), ...(mData.upcoming || [])];
         setMaintenanceWindows(activeAndUpcoming);
+        try {
+          localStorage.setItem("heimdall_maintenance_cache", JSON.stringify(activeAndUpcoming));
+        } catch {}
       }
 
       if (res.status === "fulfilled") {
@@ -108,6 +142,9 @@ export default function StatusPage() {
         if (res.value.ok) {
           const json = await res.value.json();
           setData(json);
+          try {
+            localStorage.setItem("heimdall_status_cache", JSON.stringify(json));
+          } catch {}
 
           // Sound alarm detection
           if (json.overallStatus === "outage" && prevStatusRef.current && prevStatusRef.current !== "outage") {
@@ -120,6 +157,7 @@ export default function StatusPage() {
       }
       return false;
     } catch (err) {
+      clearTimeout(timeoutId);
       console.error(err);
       return false;
     } finally {
@@ -187,7 +225,7 @@ export default function StatusPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <div className="min-h-screen bg-[#070a0f] text-zinc-100 flex items-center justify-center font-mono text-xs">
         <div className="flex flex-col items-center space-y-4 p-8 bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000]">

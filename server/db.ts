@@ -7,6 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let clientInstance: Client | null = null;
 let isInitialized = false;
+let initPromise: Promise<void> | null = null;
 
 export function getDb(): Client {
   if (!clientInstance) {
@@ -47,7 +48,29 @@ export function getDb(): Client {
 
 export async function initDb(): Promise<void> {
   if (isInitialized) return;
+  if (!initPromise) {
+    initPromise = _runInitDb().catch((err) => {
+      initPromise = null;
+      throw err;
+    });
+  }
+  return initPromise;
+}
+
+async function _runInitDb(): Promise<void> {
+  if (isInitialized) return;
   const db = getDb();
+
+  // Fast-path: Check if database schema is already bootstrapped to avoid 35 roundtrips on cold starts
+  try {
+    const tableCheck = await db.execute("SELECT 1 FROM services LIMIT 1");
+    if (tableCheck) {
+      isInitialized = true;
+      return;
+    }
+  } catch {
+    // Services table does not exist yet; proceed with full schema setup
+  }
 
   // Create tables
   await db.execute(`
