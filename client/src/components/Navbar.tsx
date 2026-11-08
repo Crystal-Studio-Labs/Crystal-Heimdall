@@ -1,34 +1,25 @@
 import React, { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { 
   Activity, 
   BarChart3, 
   Settings, 
-  LogOut, 
   LayoutDashboard, 
   Volume2, 
   VolumeX, 
   Lock,
-  BookOpen,
-  Radio
+  BookOpen
 } from "lucide-react";
-import { clearAuthToken, isOperatorAuthenticated, getSessionInfo } from "../lib/api";
+import { isOperatorAuthenticated, getSessionInfo } from "../lib/api";
 import { useToast } from "../lib/ToastContext";
 import { isAudioMuted, setAudioMuted, playTestSound } from "../lib/audioAlerts";
 
 export default function Navbar() {
   const location = useLocation();
-  const navigate = useNavigate();
   const toast = useToast();
   const isAuthenticated = isOperatorAuthenticated();
   const session = getSessionInfo();
   const [muted, setMuted] = useState(isAudioMuted());
-
-  const handleLogout = () => {
-    clearAuthToken();
-    toast.info("Signed out of Operator Console");
-    navigate("/");
-  };
 
   const handleToggleSound = () => {
     const next = !muted;
@@ -177,21 +168,15 @@ export default function Navbar() {
                 <span>PUBLIC STATUS</span>
               </Link>
 
-              <span
-                className="px-2 py-1 text-[10px] font-mono bg-emerald-950/60 border border-emerald-500/60 text-emerald-400 font-bold uppercase"
-                title={`Active 2FA session valid for ~${session.daysRemaining || 30} days`}
+              <Link
+                to="/dashboard/settings"
+                className="px-2.5 py-1 text-[10px] font-mono bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/60 hover:border-emerald-400 text-emerald-400 hover:text-emerald-300 font-bold uppercase transition flex items-center gap-1.5 shadow-[2px_2px_0px_#000]"
+                title={`Active 2FA session valid for ~${session.daysRemaining || 30} days. Click to manage session or sign out in Settings.`}
               >
+                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
                 <span className="hidden sm:inline">[OPERATOR{session.daysRemaining ? `: ~${session.daysRemaining}d` : ""}]</span>
                 <span className="sm:hidden">[OP]</span>
-              </span>
-
-              <button
-                onClick={handleLogout}
-                className="p-1.5 sm:p-2 bg-zinc-900 hover:bg-rose-950 text-zinc-400 hover:text-rose-300 border-2 border-zinc-700 hover:border-rose-600 transition shadow-[2px_2px_0px_#000]"
-                title="Sign out of Operator Session"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
+              </Link>
             </div>
           ) : (
             /* Public Visitor Login CTA */

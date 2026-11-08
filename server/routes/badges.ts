@@ -18,31 +18,74 @@ function escapeXml(unsafe: string): string {
   });
 }
 
+interface BadgeOptions {
+  style?: "flat-square" | "pill" | "flat";
+  pulse?: boolean;
+  color?: string;
+}
+
+function resolveColor(input?: string): string | undefined {
+  if (!input) return undefined;
+  const map: Record<string, string> = {
+    emerald: "#10b981",
+    green: "#10b981",
+    cyan: "#06b6d4",
+    blue: "#0284c7",
+    sky: "#0284c7",
+    amber: "#f59e0b",
+    yellow: "#eab308",
+    rose: "#f43f5e",
+    red: "#ef4444",
+    indigo: "#6366f1",
+    purple: "#a855f7",
+    violet: "#8b5cf6",
+    gray: "#71717a",
+    zinc: "#71717a",
+    black: "#18181b",
+  };
+  const key = input.toLowerCase().trim();
+  if (map[key]) return map[key];
+  if (/^#?[0-9a-f]{3,8}$/i.test(key)) {
+    return key.startsWith("#") ? key : `#${key}`;
+  }
+  return undefined;
+}
+
 function renderSvgBadge(
   label: string,
   value: string,
   color: string,
-  redirectUrl: string = DEFAULT_REDIRECT_URL
+  redirectUrl: string = DEFAULT_REDIRECT_URL,
+  options: BadgeOptions = {}
 ): string {
   const cleanLabel = escapeXml(label.trim());
   const cleanValue = escapeXml(value.trim());
   const cleanLink = escapeXml((redirectUrl || DEFAULT_REDIRECT_URL).trim());
+  const style = options.style || "flat-square";
+  const pulse = options.pulse === true;
+  const effectiveColor = options.color || color;
 
-  // Approximate character-width measurement for monospace font (7.2px per char + 16px padding)
+  // Measurement
   const labelWidth = Math.max(40, Math.round(cleanLabel.length * 7.2 + 16));
-  const valueWidth = Math.max(40, Math.round(cleanValue.length * 7.2 + 16));
+  const dotWidth = pulse ? 12 : 0;
+  const valueWidth = Math.max(40, Math.round(cleanValue.length * 7.2 + 16 + dotWidth));
   const totalWidth = labelWidth + valueWidth;
+  const rx = style === "pill" ? 10 : style === "flat" ? 3 : 0;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${totalWidth} 20" width="${totalWidth}" height="20" role="img" aria-label="${cleanLabel}: ${cleanValue}">
   <title>${cleanLabel}: ${cleanValue} (Click to open Crystal Heimdall)</title>
   <a xlink:href="${cleanLink}" href="${cleanLink}" target="_blank">
     <g shape-rendering="crispEdges">
-      <rect width="${labelWidth}" height="20" fill="#18181b"/>
-      <rect x="${labelWidth}" width="${valueWidth}" height="20" fill="${color}"/>
+      <rect width="${labelWidth}" height="20" rx="${rx}" fill="#0f141c"/>
+      <rect x="${labelWidth}" width="${valueWidth}" height="20" rx="${rx}" fill="${effectiveColor}"/>
     </g>
+    ${pulse ? `
+    <circle cx="${labelWidth + 10}" cy="10" r="3.5" fill="#ffffff">
+      <animate attributeName="opacity" values="1;0.25;1" dur="1.8s" repeatCount="indefinite" />
+    </circle>` : ""}
     <g fill="#fff" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="11" font-weight="700">
-      <text x="${Math.round(labelWidth / 2)}" y="14" fill="#a1a1aa">${cleanLabel}</text>
-      <text x="${labelWidth + Math.round(valueWidth / 2)}" y="14" fill="#ffffff">${cleanValue}</text>
+      <text x="${Math.round(labelWidth / 2)}" y="14" fill="#94a3b8">${cleanLabel}</text>
+      <text x="${labelWidth + (pulse ? 8 : 0) + Math.round((valueWidth - (pulse ? 8 : 0)) / 2)}" y="14" fill="#ffffff">${cleanValue}</text>
     </g>
   </a>
 </svg>`;
@@ -56,6 +99,11 @@ async function handleProjectGroupBadge(groupParam: string, req: Request, res: Re
   const metric = (req.query.metric as string) || "status";
   const customLabel = req.query.label as string | undefined;
   const redirectUrl = (req.query.link as string) || DEFAULT_REDIRECT_URL;
+
+  const style = (req.query.style as any) || "flat-square";
+  const pulse = req.query.pulse === "true" || req.query.beacon === "true";
+  const customColor = resolveColor(req.query.color as string);
+  const badgeOpts: BadgeOptions = { style, pulse, color: customColor };
 
   // Resolve canonical group name if passed by ID or case-mismatched name
   const grpCheck = await db.execute({
@@ -90,22 +138,22 @@ async function handleProjectGroupBadge(groupParam: string, req: Request, res: Re
         args: isProdQuery ? [] : [group, canonicalName],
       });
       if (Number(anySvc.rows[0]?.count || 0) === 0) {
-        const svg = renderSvgBadge(label, "PROJECT NOT FOUND", "#71717a", redirectUrl);
+        const svg = renderSvgBadge(label, "PROJECT NOT FOUND", "#71717a", redirectUrl, badgeOpts);
         return res.send(svg);
       }
     }
 
     if (metric === "uptime") {
-      const svg = renderSvgBadge(label, "100.0%", "#10b981", redirectUrl);
+      const svg = renderSvgBadge(label, "100.0%", "#10b981", redirectUrl, badgeOpts);
       return res.send(svg);
     }
 
     if (metric === "latency") {
-      const svg = renderSvgBadge(label, "0ms", "#0284c7", redirectUrl);
+      const svg = renderSvgBadge(label, "0ms", "#0284c7", redirectUrl, badgeOpts);
       return res.send(svg);
     }
 
-    const svg = renderSvgBadge(label, "OPERATIONAL", "#10b981", redirectUrl);
+    const svg = renderSvgBadge(label, "OPERATIONAL", "#10b981", redirectUrl, badgeOpts);
     return res.send(svg);
   }
 
@@ -127,16 +175,16 @@ async function handleProjectGroupBadge(groupParam: string, req: Request, res: Re
 
   if (metric === "uptime") {
     const uptimeColor = avgUptime >= 99.0 ? "#10b981" : avgUptime >= 95.0 ? "#f59e0b" : "#f43f5e";
-    const svg = renderSvgBadge(label, `${avgUptime}%`, uptimeColor, redirectUrl);
+    const svg = renderSvgBadge(label, `${avgUptime}%`, uptimeColor, redirectUrl, badgeOpts);
     return res.send(svg);
   }
 
   if (metric === "latency") {
-    const svg = renderSvgBadge(label, `${avgLatency}ms`, "#0284c7", redirectUrl);
+    const svg = renderSvgBadge(label, `${avgLatency}ms`, "#0284c7", redirectUrl, badgeOpts);
     return res.send(svg);
   }
 
-  const svg = renderSvgBadge(label, overallStatus.toUpperCase(), statusColor, redirectUrl);
+  const svg = renderSvgBadge(label, overallStatus.toUpperCase(), statusColor, redirectUrl, badgeOpts);
   return res.send(svg);
 }
 
@@ -147,6 +195,11 @@ async function handleServiceBadge(serviceIdOrName: string, req: Request, res: Re
   target = target.replace(/\.svg$/i, "").replace(/\/status$/i, "").trim();
   const metric = (req.query.metric as string) || "status";
   const customLabel = req.query.label as string | undefined;
+
+  const style = (req.query.style as any) || "flat-square";
+  const pulse = req.query.pulse === "true" || req.query.beacon === "true";
+  const customColor = resolveColor(req.query.color as string);
+  const badgeOpts: BadgeOptions = { style, pulse, color: customColor };
 
   const svcRes = await db.execute({
     sql: "SELECT * FROM services WHERE id = ? OR LOWER(name) = LOWER(?) LIMIT 1",
@@ -160,7 +213,7 @@ async function handleServiceBadge(serviceIdOrName: string, req: Request, res: Re
   const redirectUrl = (req.query.link as string) || defaultServiceRedirect;
 
   if (!service) {
-    const svg = renderSvgBadge(customLabel || "heimdall", "TARGET NOT FOUND", "#71717a", redirectUrl);
+    const svg = renderSvgBadge(customLabel || "heimdall", "TARGET NOT FOUND", "#71717a", redirectUrl, badgeOpts);
     return res.send(svg);
   }
 
@@ -169,12 +222,12 @@ async function handleServiceBadge(serviceIdOrName: string, req: Request, res: Re
   if (metric === "uptime") {
     const uptime = Number(service.uptime_pct || 100);
     const uptimeColor = uptime >= 99.0 ? "#10b981" : uptime >= 95.0 ? "#f59e0b" : "#f43f5e";
-    const svg = renderSvgBadge(label, `${uptime.toFixed(1)}%`, uptimeColor, redirectUrl);
+    const svg = renderSvgBadge(label, `${uptime.toFixed(1)}%`, uptimeColor, redirectUrl, badgeOpts);
     return res.send(svg);
   }
 
   if (metric === "latency") {
-    const svg = renderSvgBadge(label, `${service.latency_ms || 0}ms`, "#0284c7", redirectUrl);
+    const svg = renderSvgBadge(label, `${service.latency_ms || 0}ms`, "#0284c7", redirectUrl, badgeOpts);
     return res.send(svg);
   }
 
@@ -193,7 +246,7 @@ async function handleServiceBadge(serviceIdOrName: string, req: Request, res: Re
     statusColor = "#0284c7";
   }
 
-  const svg = renderSvgBadge(label, statusText.toUpperCase(), statusColor, redirectUrl);
+  const svg = renderSvgBadge(label, statusText.toUpperCase(), statusColor, redirectUrl, badgeOpts);
   return res.send(svg);
 }
 
@@ -242,6 +295,11 @@ router.get(["/:id/status.svg", "/:id.svg", "/:id"], async (req: Request, res: Re
     const customLabel = req.query.label as string | undefined;
     const redirectUrl = (req.query.link as string) || DEFAULT_REDIRECT_URL;
 
+    const style = (req.query.style as any) || "flat-square";
+    const pulse = req.query.pulse === "true" || req.query.beacon === "true";
+    const customColor = resolveColor(req.query.color as string);
+    const badgeOpts: BadgeOptions = { style, pulse, color: customColor };
+
     res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
     res.setHeader("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate");
     res.setHeader("Pragma", "no-cache");
@@ -265,11 +323,11 @@ router.get(["/:id/status.svg", "/:id.svg", "/:id"], async (req: Request, res: Re
 
       if (metric === "uptime") {
         const uptimeColor = avgUptime >= 99.0 ? "#10b981" : avgUptime >= 95.0 ? "#f59e0b" : "#f43f5e";
-        const svg = renderSvgBadge(customLabel || "FLEET UPTIME", `${avgUptime}%`, uptimeColor, redirectUrl);
+        const svg = renderSvgBadge(customLabel || "FLEET UPTIME", `${avgUptime}%`, uptimeColor, redirectUrl, badgeOpts);
         return res.send(svg);
       }
 
-      const svg = renderSvgBadge(customLabel || "FLEET STATUS", overallStatus.toUpperCase(), statusColor, redirectUrl);
+      const svg = renderSvgBadge(customLabel || "FLEET STATUS", overallStatus.toUpperCase(), statusColor, redirectUrl, badgeOpts);
       return res.send(svg);
     }
 

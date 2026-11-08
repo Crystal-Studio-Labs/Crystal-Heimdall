@@ -1119,27 +1119,26 @@ async function runSmokeTests() {
   }
   console.log(`   ✅ In-Browser Conduit Simulator verified: Severity='${simData.simulatedPayload.severity}', Latency=${simData.latencyMs}ms, Delivered=${simData.success}`);
 
-  // 33. TEST EMBEDDABLE MINI STATUS WIDGET & PILL (/status/widget)
-  console.log("\n33. TEST EMBEDDABLE MINI STATUS WIDGET & PILL (/status/widget)");
-  // 33a. Compact Pill
-  const pillRes = await fetch(`${BASE_URL}/status/widget?compact=true`);
-  const pillHtml = await pillRes.text();
-  const pillFrameHeader = pillRes.headers.get("x-frame-options");
-  if (!pillRes.ok || !pillHtml.includes("Crystal Heimdall Status Pill") || !pillHtml.includes("class=\"pill\"")) {
-    throw new Error("Compact widget endpoint failed to serve valid HTML!");
+  // 33. TEST DYNAMIC MULTI-STYLE SVG BADGES & WIDGET DEPRECATION REDIRECT
+  console.log("\n33. TEST DYNAMIC MULTI-STYLE SVG BADGES & WIDGET DEPRECATION REDIRECT");
+  // 33a. Legacy widget 301 redirect
+  const widgetRedirectRes = await fetch(`${BASE_URL}/status/widget`, { redirect: "manual" });
+  if (widgetRedirectRes.status !== 301) {
+    throw new Error(`Expected /status/widget to return 301 redirect, got ${widgetRedirectRes.status}`);
   }
-  if (pillFrameHeader === "DENY") {
-    throw new Error("Widget endpoint is blocked from framing (X-Frame-Options: DENY)!");
+  const redirectLocation = widgetRedirectRes.headers.get("location");
+  if (!redirectLocation || !redirectLocation.includes("/api/v1/badges/fleet/status.svg")) {
+    throw new Error(`Invalid widget redirect target: ${redirectLocation}`);
   }
-  console.log("   ✅ Embeddable compact status pill verified with frame embedding allowed.");
+  console.log("   ✅ Deprecated widget route 301 permanently redirects to dynamic fleet badge.");
 
-  // 33b. Full Brutalist Card Widget
-  const cardRes = await fetch(`${BASE_URL}/status/widget`);
-  const cardHtml = await cardRes.text();
-  if (!cardRes.ok || !cardHtml.includes("CRYSTAL HEIMDALL SENTINEL") || !cardHtml.includes("class=\"widget-card\"")) {
-    throw new Error("Full card widget endpoint failed to serve valid HTML!");
+  // 33b. Multi-style badge with live radar beacon and custom color
+  const pillBadgeRes = await fetch(`${BASE_URL}/api/v1/badges/fleet/status.svg?style=pill&pulse=true&color=emerald`);
+  const pillBadgeSvg = await pillBadgeRes.text();
+  if (!pillBadgeRes.ok || !pillBadgeSvg.includes('rx="10"') || !pillBadgeSvg.includes("<animate")) {
+    throw new Error("Pill-style badge with pulsing beacon failed to render correct SVG elements!");
   }
-  console.log("   ✅ Embeddable brutalist status card verified with live SLA and monitored count.");
+  console.log("   ✅ Multi-style SVG badge verified: Rounded Pill (rx=10) with animated radar beacon (<animate>).");
 
   // 34. TEST AES-256-GCM CRYPTOGRAPHIC HARDENING & SELF-HEALING MIGRATION
   console.log("\n34. TEST AES-256-GCM CRYPTOGRAPHIC HARDENING & SELF-HEALING MIGRATION");

@@ -76,7 +76,6 @@ import badgesRoutes from "./routes/badges.js";
 import groupsRoutes from "./routes/groups.js";
 import subscribersRoutes from "./routes/subscribers.js";
 import maintenanceRoutes from "./routes/maintenance.js";
-import widgetRoutes from "./routes/widget.js";
 import pushRoutes from "./routes/push.js";
 import { getRssFeedHandler } from "./routes/status.js";
 
@@ -103,7 +102,9 @@ app.get([
 ], getRssFeedHandler);
 
 // Mount API Routes
-app.use(["/status/widget", "/api/v1/status/widget", "/widget"], widgetRoutes);
+app.get(["/status/widget", "/api/v1/status/widget", "/widget"], (_req, res) => {
+  return res.redirect(301, "/api/v1/badges/fleet/status.svg");
+});
 app.use(["/api/v1/push", "/push"], pushRoutes);
 app.use(["/api/v1/subscribers", "/subscribers"], subscribersRoutes);
 app.use(["/api/v1/maintenance", "/maintenance"], maintenanceRoutes);

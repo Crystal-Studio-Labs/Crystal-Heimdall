@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import SEO from "../components/SEO";
 import { 
@@ -38,10 +39,12 @@ import {
   Calendar,
   Download,
   Sparkles,
-  Radio
+  Radio,
+  LogOut,
+  Lock
 } from "lucide-react";
 import { useToast } from "../lib/ToastContext";
-import { getAuthToken } from "../lib/api";
+import { getAuthToken, clearAuthToken, getSessionInfo } from "../lib/api";
 
 export interface ProjectGroup {
   id: string;
@@ -88,8 +91,15 @@ interface AdvancedSettings {
 
 export default function SettingsPage() {
   const toast = useToast();
+  const navigate = useNavigate();
+
+  const handleOperatorSignOut = () => {
+    clearAuthToken();
+    toast.info("Signed out of Operator Console. Session terminated.");
+    navigate("/");
+  };
   const [activeTab, setActiveTab] = useState<
-    "status" | "groups" | "badges" | "advanced" | "alerts" | "subscribers" | "maintenance" | "widget" | "security"
+    "status" | "groups" | "badges" | "advanced" | "alerts" | "subscribers" | "maintenance" | "security"
   >("status");
 
   // Status Page Configuration (Uptime Kuma Style)
@@ -150,6 +160,9 @@ export default function SettingsPage() {
   const [badgeMetric, setBadgeMetric] = useState<"status" | "uptime" | "latency">("status");
   const [badgeCustomLabel, setBadgeCustomLabel] = useState<string>("");
   const [badgeRedirectUrl, setBadgeRedirectUrl] = useState<string>("https://crystal-heimdall.vercel.app/");
+  const [badgeStyle, setBadgeStyle] = useState<"flat-square" | "pill" | "flat">("flat-square");
+  const [badgePulse, setBadgePulse] = useState<boolean>(true);
+  const [badgeColor, setBadgeColor] = useState<string>("");
 
   const fetchGroups = async () => {
     setIsLoadingGroups(true);
@@ -853,10 +866,22 @@ export default function SettingsPage() {
               Manage public status customization, project groups, embeddable shields, uptime engine, and notification relays.
             </p>
           </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleOperatorSignOut}
+              className="px-4 py-2 bg-rose-950/80 hover:bg-rose-900 border-2 border-rose-600 hover:border-rose-500 text-rose-200 font-mono font-bold text-xs uppercase flex items-center gap-2 shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition"
+              title="Terminate authenticated operator session and return to public status deck"
+            >
+              <LogOut className="w-4 h-4 text-rose-400" />
+              <span>[ SIGN OUT / LOGOUT ]</span>
+            </button>
+          </div>
         </div>
 
         {/* TOP TAB CONTROLS (INDUSTRIAL BRUTALIST ROCKER TABS) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-9 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
           {[
             { id: "status", label: "[01] STATUS" },
             { id: "groups", label: "[02] GROUPS" },
@@ -865,8 +890,7 @@ export default function SettingsPage() {
             { id: "alerts", label: "[05] DISPATCH" },
             { id: "subscribers", label: "[06] SUBSCRIBERS" },
             { id: "maintenance", label: "[07] MAINTENANCE" },
-            { id: "widget", label: "[08] WIDGET" },
-            { id: "security", label: "[09] SECURITY" },
+            { id: "security", label: "[08] SECURITY" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -1478,7 +1502,82 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Control 3: Target Redirect URL (Span 2) */}
+                {/* Control 3: Badge Style & Pulse Radar Beacon */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-zinc-300 uppercase block font-mono">
+                    // 3. BADGE STYLE & LIVE PULSE //
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { id: "flat-square", label: "FLAT-SQUARE" },
+                      { id: "pill", label: "ROUNDED PILL" },
+                      { id: "flat", label: "FLAT (CLASSIC)" },
+                    ].map((s) => (
+                      <button
+                        type="button"
+                        key={s.id}
+                        onClick={() => setBadgeStyle(s.id as any)}
+                        className={`p-2 text-[10px] font-bold font-mono border transition text-center uppercase ${
+                          badgeStyle === s.id
+                            ? "bg-purple-950 border-purple-400 text-purple-300"
+                            : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-between p-2 bg-zinc-950 border border-zinc-800">
+                    <span className="text-[10px] font-bold text-zinc-300 font-mono">
+                      RADAR BEACON PULSE ANIMATION:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setBadgePulse(!badgePulse)}
+                      className={`px-3 py-1 text-[10px] font-bold font-mono border transition uppercase ${
+                        badgePulse
+                          ? "bg-emerald-950 border-emerald-400 text-emerald-300"
+                          : "bg-zinc-900 border-zinc-700 text-zinc-500"
+                      }`}
+                    >
+                      {badgePulse ? "[ ENABLED (PULSING) ]" : "[ DISABLED ]"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Control 4: Custom Color Preset Override */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-zinc-300 uppercase block font-mono">
+                    // 4. COLOR THEME OVERRIDE //
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    {[
+                      { id: "", label: "AUTO / DYNAMIC", color: "#10b981" },
+                      { id: "emerald", label: "EMERALD", color: "#10b981" },
+                      { id: "cyan", label: "CYAN", color: "#06b6d4" },
+                      { id: "violet", label: "VIOLET", color: "#8b5cf6" },
+                      { id: "amber", label: "AMBER", color: "#f59e0b" },
+                      { id: "rose", label: "ROSE", color: "#ef4444" },
+                    ].map((c) => (
+                      <button
+                        type="button"
+                        key={c.id}
+                        onClick={() => setBadgeColor(c.id)}
+                        className={`p-1.5 text-[9px] font-bold font-mono border transition text-center uppercase flex items-center justify-center gap-1 ${
+                          badgeColor === c.id
+                            ? "border-white text-white bg-zinc-800 shadow-[2px_2px_0px_#fff]"
+                            : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
+                        <span>{c.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Control 5: Target Redirect URL (Span 2) */}
                 <div className="md:col-span-2 space-y-1 pt-2 border-t border-zinc-800">
                   <label className="text-[11px] font-bold text-zinc-300 uppercase block font-mono">
                     // 3. ON-CLICK REDIRECT DESTINATION //
@@ -1527,6 +1626,9 @@ export default function SettingsPage() {
                 const params = new URLSearchParams();
                 if (badgeMetric !== "status") params.set("metric", badgeMetric);
                 if (badgeCustomLabel.trim()) params.set("label", badgeCustomLabel.trim());
+                if (badgeStyle && badgeStyle !== "flat-square") params.set("style", badgeStyle);
+                if (badgePulse) params.set("pulse", "true");
+                if (badgeColor) params.set("color", badgeColor);
 
                 const defaultRedirect = badgeScope === "service" && effectiveServiceId
                   ? `https://crystal-heimdall.vercel.app/service/${effectiveServiceId}`
@@ -2553,130 +2655,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* TAB 8: EMBEDDABLE WIDGET & SNIPPETS */}
-        {activeTab === "widget" && (
-          <div className="space-y-6">
-            <div className="bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000] p-6 sm:p-8 space-y-6">
-              <div className="space-y-1 border-b-2 border-zinc-800 pb-4">
-                <div className="flex items-center space-x-2 text-xs text-sky-400 font-bold">
-                  <Sparkles className="w-4 h-4 text-sky-400" />
-                  <span>[EMBEDDABLE MINI STATUS WIDGET &amp; SHIELDS]</span>
-                </div>
-                <h2 className="text-base sm:text-lg font-black text-white uppercase">
-                  Floating Status Widget &amp; Embed Codes
-                </h2>
-                <p className="text-xs text-zinc-400 font-sans">
-                  Integrate live uptime indicators directly into your product footers, dev docs, or organization portals (e.g. KrishiSetu, Campus Relay).
-                </p>
-              </div>
-
-              {/* Widget Previews */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Format 1: Compact Pill */}
-                <div className="bg-black border-2 border-zinc-800 p-5 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white uppercase">// COMPACT PILL EMBED //</span>
-                    <span className="text-[10px] text-zinc-500 font-mono">220px × 34px</span>
-                  </div>
-
-                  <div className="p-4 bg-[#070a0f] border border-zinc-800 flex items-center justify-center">
-                    <iframe
-                      src="/status/widget?compact=true"
-                      width="220"
-                      height="34"
-                      title="Compact Status Pill Preview"
-                      style={{ border: "none", overflow: "hidden" }}
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-[10px] text-zinc-400">
-                      <span>HTML IFRAME CODE</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(`<iframe src="${window.location.origin}/status/widget?compact=true" width="220" height="34" frameborder="0" scrolling="no"></iframe>`);
-                          toast.success("Compact snippet copied!");
-                        }}
-                        className="text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1"
-                      >
-                        <Copy className="w-3 h-3" />
-                        <span>COPY</span>
-                      </button>
-                    </div>
-                    <pre className="p-2.5 bg-[#0b0f17] border border-zinc-800 text-[10px] text-zinc-300 overflow-x-auto">
-                      {`<iframe src="${window.location.origin}/status/widget?compact=true" width="220" height="34" frameborder="0" scrolling="no"></iframe>`}
-                    </pre>
-                  </div>
-                </div>
-
-                {/* Format 2: Brutalist Card */}
-                <div className="bg-black border-2 border-zinc-800 p-5 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white uppercase">// FULL BRUTALIST CARD //</span>
-                    <span className="text-[10px] text-zinc-500 font-mono">320px × 74px</span>
-                  </div>
-
-                  <div className="p-4 bg-[#070a0f] border border-zinc-800 flex items-center justify-center">
-                    <iframe
-                      src="/status/widget"
-                      width="320"
-                      height="74"
-                      title="Full Status Card Preview"
-                      style={{ border: "none", overflow: "hidden" }}
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-[10px] text-zinc-400">
-                      <span>HTML IFRAME CODE</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(`<iframe src="${window.location.origin}/status/widget" width="320" height="74" frameborder="0" scrolling="no"></iframe>`);
-                          toast.success("Card snippet copied!");
-                        }}
-                        className="text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1"
-                      >
-                        <Copy className="w-3 h-3" />
-                        <span>COPY</span>
-                      </button>
-                    </div>
-                    <pre className="p-2.5 bg-[#0b0f17] border border-zinc-800 text-[10px] text-zinc-300 overflow-x-auto">
-                      {`<iframe src="${window.location.origin}/status/widget" width="320" height="74" frameborder="0" scrolling="no"></iframe>`}
-                    </pre>
-                  </div>
-                </div>
-              </div>
-
-              {/* Markdown & React Embed Snippets */}
-              <div className="bg-black border-2 border-zinc-800 p-5 space-y-4">
-                <span className="text-xs font-bold text-white uppercase">// REPO README &amp; GITHUB SHIELDS //</span>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-[10px] text-zinc-400">
-                    <span>GITHUB / MARKDOWN BADGE</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(`[![Crystal Heimdall Status](${window.location.origin}/api/v1/badges/status)](${window.location.origin}/)`);
-                        toast.success("Markdown badge snippet copied!");
-                      }}
-                      className="text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1"
-                    >
-                      <Copy className="w-3 h-3" />
-                      <span>COPY</span>
-                    </button>
-                  </div>
-                  <pre className="p-2.5 bg-[#0b0f17] border border-zinc-800 text-[10px] text-zinc-300 overflow-x-auto">
-                    {`[![Crystal Heimdall Status](${window.location.origin}/api/v1/badges/status)](${window.location.origin}/)`}
-                  </pre>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 9: ACCESS & SECURITY */}
+        {/* TAB 8: ACCESS & SECURITY */}
         {activeTab === "security" && (
           <div className="bg-[#0b0f17] border-2 border-emerald-500/50 shadow-[4px_4px_0px_#000] p-6 sm:p-8 space-y-4">
             <div className="flex items-center space-x-3">
@@ -2688,6 +2667,28 @@ export default function SettingsPage() {
             <p className="text-xs text-zinc-300 leading-relaxed font-sans">
               Crystal-Heimdall strictly isolates operator commands behind direct Two-Factor Authentication (2FA Only). There are no master passcodes and no GitHub OAuth dependencies. Operators authenticate directly using a rolling 6-digit Time-based One-Time Password (RFC 6238 TOTP) from Google Authenticator, Ente Auth, or 1Password. In development and testing environments, bypass code <code className="text-emerald-400 font-mono font-bold">000000</code> is accepted.
             </p>
+
+            {/* Operator Session Revocation Card */}
+            <div className="p-4 bg-black border-2 border-rose-900/60 flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+              <div className="space-y-1">
+                <div className="text-xs font-bold text-rose-400 font-mono flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>ACTIVE 2FA OPERATOR SESSION</span>
+                </div>
+                <p className="text-[11px] text-zinc-400 font-mono">
+                  Session token stored securely in localStorage. Terminating session revokes all operator control deck access immediately.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleOperatorSignOut}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-black font-mono font-black text-xs uppercase flex items-center gap-2 shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition shrink-0"
+                title="Terminate operator session"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>[ TERMINATE OPERATOR SESSION ]</span>
+              </button>
+            </div>
           </div>
         )}
 
