@@ -32,8 +32,8 @@ export function broadcastStatusUpdate(payload?: any) {
   }
 }
 
-// Keep-alive heartbeat interval every 15s
-setInterval(() => {
+// Keep-alive heartbeat interval every 15s (unreferenced so serverless runners can exit cleanly)
+const sseTimer = setInterval(() => {
   if (sseClients.size === 0) return;
   const ping = `event: heartbeat\ndata: ${JSON.stringify({ timestamp: Date.now() })}\n\n`;
   for (const client of sseClients) {
@@ -44,9 +44,17 @@ setInterval(() => {
     }
   }
 }, 15000);
+if (sseTimer && typeof sseTimer.unref === "function") {
+  sseTimer.unref();
+}
 
 // GET /stream - Real-time Server-Sent Events stream for instant status updates
 router.get("/stream", (req: Request, res: Response) => {
+  // Serverless environments (Vercel) cannot hold persistent streaming connections without worker exhaustion
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return res.status(204).end();
+  }
+
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache, no-transform",

@@ -1,9 +1,6 @@
-import { createRequire } from "node:module";
+import * as webpush from "web-push";
 import { getDb, initDb } from "./db.js";
 import { encryptSecret, decryptSecret } from "./crypto.js";
-
-const require = createRequire(import.meta.url);
-const webpush = require("web-push");
 
 export interface PushSubscriptionKeys {
   p256dh: string;

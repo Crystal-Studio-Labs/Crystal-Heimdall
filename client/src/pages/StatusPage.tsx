@@ -138,7 +138,11 @@ export default function StatusPage() {
         fetchStatus();
       });
       evtSource.onerror = () => {
-        // SSE disconnected, fallback gracefully to periodic interval
+        // Prevent aggressive browser reconnection storms on serverless hosts
+        if (evtSource) {
+          evtSource.close();
+          evtSource = null;
+        }
       };
     } catch {
       // EventSource not supported
@@ -183,7 +187,7 @@ export default function StatusPage() {
     }
   };
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-[#070a0f] text-zinc-100 flex items-center justify-center font-mono text-xs">
         <div className="flex flex-col items-center space-y-4 p-8 bg-[#0b0f17] border-2 border-zinc-700 shadow-[4px_4px_0px_#000]">
@@ -191,6 +195,28 @@ export default function StatusPage() {
           <span className="text-zinc-300 font-bold uppercase tracking-wider">
             [SYNCING TELEMETRY CONDUITS...]
           </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-[#070a0f] text-zinc-100 flex items-center justify-center font-mono text-xs p-4">
+        <div className="flex flex-col items-center space-y-4 p-8 bg-[#0b0f17] border-2 border-amber-500 shadow-[6px_6px_0px_#000] max-w-md text-center">
+          <AlertTriangle className="w-10 h-10 text-amber-400" />
+          <h2 className="text-sm font-black uppercase text-white tracking-wider">
+            SENTINEL TELEMETRY HANDSHAKE IN PROGRESS
+          </h2>
+          <p className="text-zinc-400 text-[11px] leading-relaxed">
+            The telemetry API is warming up or synchronizing with database replicas.
+          </p>
+          <button
+            onClick={() => { setIsLoading(true); fetchStatus(); }}
+            className="bg-emerald-500 hover:bg-emerald-400 text-black px-4 py-2 font-black uppercase text-xs shadow-[3px_3px_0px_#000] active:translate-x-0.5 active:translate-y-0.5"
+          >
+            [ RETRY TELEMETRY SYNC ]
+          </button>
         </div>
       </div>
     );

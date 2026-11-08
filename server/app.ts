@@ -54,8 +54,9 @@ app.use(async (_req, _res, next) => {
   try {
     await initDb();
     next();
-  } catch (err) {
-    next(err);
+  } catch (err: any) {
+    console.warn("[App Cold-Start DB Warning]:", err?.message);
+    next();
   }
 });
 
@@ -253,6 +254,17 @@ if (fs.existsSync(clientDist)) {
     res.sendFile(path.join(clientDist, "index.html"));
   });
 }
+
+// Global Express Error Handler
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("[Heimdall Internal Server Error]", err);
+  if (!res.headersSent) {
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: err?.message || String(err),
+    });
+  }
+});
 
 export { app, initDb };
 export default app;
