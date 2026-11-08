@@ -249,7 +249,7 @@ router.get(["/:id/status.svg", "/:id.svg", "/:id"], async (req: Request, res: Re
     res.setHeader("Access-Control-Allow-Origin", "*");
 
     // Fleet-wide aggregation badge
-    if (id === "fleet") {
+    if (id === "fleet" || id === "overall" || id === "all") {
       const svcRes = await db.execute("SELECT status, uptime_pct FROM services WHERE is_public = 1 OR is_public IS NULL");
       const services = svcRes.rows as any[];
 
