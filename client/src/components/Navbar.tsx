@@ -147,7 +147,7 @@ export default function Navbar() {
               );
             })
           ) : (
-            /* Public Visitors Menu (Only Status, Incidents, Overview) */
+            /* Public Visitors Menu (Strictly Status Page only) */
             <div className="flex items-center space-x-1 text-xs font-mono font-bold">
               <Link
                 to="/"
@@ -158,26 +158,6 @@ export default function Navbar() {
                 }`}
               >
                 STATUS
-              </Link>
-              <Link
-                to="/incidents"
-                className={`px-3 py-1.5 border transition ${
-                  location.pathname.startsWith("/incidents")
-                    ? "bg-zinc-900 border-rose-500 text-rose-300 shadow-[2px_2px_0px_#000]"
-                    : "border-transparent text-zinc-400 hover:text-white hover:border-zinc-800"
-                }`}
-              >
-                INCIDENTS
-              </Link>
-              <Link
-                to="/overview"
-                className={`px-3 py-1.5 border transition ${
-                  location.pathname === "/overview" || location.pathname === "/about"
-                    ? "bg-zinc-900 border-cyan-500 text-cyan-300 shadow-[2px_2px_0px_#000]"
-                    : "border-transparent text-zinc-400 hover:text-white hover:border-zinc-800"
-                }`}
-              >
-                OVERVIEW
               </Link>
             </div>
           )}

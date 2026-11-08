@@ -794,8 +794,8 @@ export default function ServiceDetailPage() {
           </div>
         </div>
 
-        {/* BRUTALIST FOOTER */}
-        <footer className="mt-12 border-t-2 border-zinc-800 pt-8 pb-4 text-xs font-mono text-zinc-500 flex flex-col sm:flex-row items-center justify-between gap-4">
+        {/* BRUTALIST FOOTER (DESKTOP ONLY — HIDDEN ON MOBILE) */}
+        <footer className="hidden md:flex mt-12 border-t-2 border-zinc-800 pt-8 pb-4 text-xs font-mono text-zinc-500 flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
             <span className="text-white font-bold uppercase">
               Crystal Studio Labs • Autonomous Sentinel
@@ -804,12 +804,6 @@ export default function ServiceDetailPage() {
           <div className="flex items-center space-x-4">
             <Link to="/" className="text-zinc-400 hover:text-white transition">
               STATUS PAGE
-            </Link>
-            <Link to="/incidents" className="text-zinc-400 hover:text-white transition">
-              INCIDENTS
-            </Link>
-            <Link to="/overview" className="text-zinc-400 hover:text-white transition">
-              OVERVIEW
             </Link>
           </div>
         </footer>

@@ -50,7 +50,7 @@ export default function NotFoundPage() {
         </div>
       </main>
 
-      <footer className="py-6 text-center text-[11px] text-zinc-600 border-t-2 border-zinc-800">
+      <footer className="hidden md:block py-6 text-center text-[11px] text-zinc-600 border-t-2 border-zinc-800">
         Uptime Tracker For Crystal Studio Labs • Sentinel Telemetry
       </footer>
     </div>

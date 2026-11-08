@@ -275,8 +275,8 @@ export default function LoginPage() {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t-2 border-zinc-800 bg-black py-4 text-center text-[11px] text-zinc-500 font-mono">
+      {/* Footer (Desktop Only) */}
+      <footer className="hidden md:block border-t-2 border-zinc-800 bg-black py-4 text-center text-[11px] text-zinc-500 font-mono">
         Uptime Tracker For Crystal Studio Labs • 2-Factor Authentication Only
       </footer>
     </div>

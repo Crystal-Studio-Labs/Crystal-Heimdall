@@ -35,19 +35,19 @@ export default function App() {
       <BrowserRouter>
         <div className="min-h-screen flex flex-col pb-14 md:pb-0">
           <Routes>
-            {/* Public Root & Status Routes */}
+            {/* Public Root & Status Routes (Public visitors only see status page) */}
             <Route path="/" element={<StatusPage />} />
             <Route path="/status" element={<Navigate to="/" replace />} />
-            <Route path="/overview" element={<LandingPage />} />
-            <Route path="/about" element={<Navigate to="/overview" replace />} />
+            <Route path="/overview" element={getAuthToken() ? <LandingPage /> : <Navigate to="/" replace />} />
+            <Route path="/about" element={<Navigate to="/" replace />} />
 
             {/* Public Service & Telemetry Diagnostics Route */}
             <Route path="/service/:id" element={<ServiceDetailPage />} />
             <Route path="/status/service/:id" element={<ServiceDetailPage />} />
 
-            {/* Public Incidents Ledger & Detail Routes */}
-            <Route path="/incidents" element={<IncidentsPage />} />
-            <Route path="/incidents/:id" element={<IncidentDetailPage />} />
+            {/* Incidents Ledger & Detail Routes (Integrated into Status Page for public; standalone for authenticated operator) */}
+            <Route path="/incidents" element={getAuthToken() ? <IncidentsPage /> : <Navigate to="/" replace />} />
+            <Route path="/incidents/:id" element={getAuthToken() ? <IncidentDetailPage /> : <Navigate to="/" replace />} />
 
             {/* Internal Documentation (Operator only; unauthenticated redirected to /) */}
             <Route 

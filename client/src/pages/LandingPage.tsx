@@ -275,8 +275,8 @@ export default function LandingPage() {
         </section>
       </main>
 
-      {/* FOOTER */}
-      <footer className="border-t-2 border-zinc-800 bg-black py-6 text-xs text-zinc-500 font-mono">
+      {/* FOOTER (DESKTOP ONLY — HIDDEN ON MOBILE) */}
+      <footer className="hidden md:block border-t-2 border-zinc-800 bg-black py-6 text-xs text-zinc-500 font-mono">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center space-x-2">
             <span className="w-2 h-2 bg-emerald-400 inline-block" />

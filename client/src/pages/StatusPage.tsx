@@ -378,11 +378,11 @@ export default function StatusPage() {
             ) : (
               <Link
                 to="/login"
-                className="p-1.5 sm:px-2 sm:py-1 text-zinc-500 hover:text-zinc-200 border border-transparent hover:border-zinc-800 text-[10px] font-mono tracking-wider transition flex items-center gap-1"
+                className="hidden sm:flex px-2 py-1 text-zinc-400 hover:text-white border border-transparent hover:border-zinc-800 text-[10px] font-mono tracking-wider transition items-center gap-1"
                 title="Operator Login"
               >
-                <Lock className="w-3 h-3 text-zinc-500" />
-                <span className="hidden sm:inline">LOGIN</span>
+                <Lock className="w-3 h-3 text-cyan-400" />
+                <span>LOGIN</span>
               </Link>
             )}
           </div>
@@ -767,8 +767,8 @@ export default function StatusPage() {
         )}
 
 
-        {/* CLEAN BRUTALIST FOOTER */}
-        <footer className="mt-12 border-t-2 border-zinc-800 pt-8 pb-4 text-xs font-mono text-zinc-500">
+        {/* CLEAN BRUTALIST FOOTER (DESKTOP ONLY — HIDDEN ON MOBILE TO PREVENT CLASH WITH BOTTOM NAV) */}
+        <footer className="hidden md:block mt-12 border-t-2 border-zinc-800 pt-8 pb-4 text-xs font-mono text-zinc-500">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center space-x-3">
               <span className="text-white font-bold uppercase">
@@ -805,10 +805,6 @@ export default function StatusPage() {
                 <span>SHARE</span>
               </button>
 
-              <Link to="/incidents" className="text-zinc-400 hover:text-white transition">
-                INCIDENTS
-              </Link>
-
               <a
                 href={settings.support_url || "https://github.com/Crystal-Studio-Labs"}
                 target="_blank"
@@ -819,7 +815,7 @@ export default function StatusPage() {
                 <ExternalLink className="w-3 h-3" />
               </a>
 
-              {isAuthenticated ? (
+              {isAuthenticated && (
                 <button
                   onClick={() => {
                     clearAuthToken();
@@ -831,14 +827,6 @@ export default function StatusPage() {
                   <LogOut className="w-3 h-3" />
                   <span>LOGOUT</span>
                 </button>
-              ) : (
-                <Link
-                  to="/login"
-                  className="text-zinc-600 hover:text-zinc-400 flex items-center gap-1 transition ml-2"
-                >
-                  <Lock className="w-2.5 h-2.5" />
-                  <span>OPERATOR</span>
-                </Link>
               )}
             </div>
           </div>

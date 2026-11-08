@@ -15,25 +15,13 @@ export const MobileBottomNav: React.FC = () => {
   const location = useLocation();
   const isAuthenticated = isOperatorAuthenticated();
 
-  // Public items for unauthenticated visitors (Normal users ONLY see public status, incidents, overview)
+  // Public items for unauthenticated visitors (Strictly Status & Login only)
   const publicNavItems = [
     {
       label: "STATUS",
       path: "/",
       icon: Activity,
       match: ["/", "/status"],
-    },
-    {
-      label: "INCIDENTS",
-      path: "/incidents",
-      icon: AlertTriangle,
-      match: ["/incidents"],
-    },
-    {
-      label: "OVERVIEW",
-      path: "/overview",
-      icon: Globe,
-      match: ["/overview", "/about"],
     },
     {
       label: "LOGIN",
