@@ -1294,7 +1294,42 @@ async function runSmokeTests() {
   }
   console.log("   ✅ CRT terminal theme tokens (Amber CRT, Matrix Emerald, Paper Light) verified in stylesheet.");
 
-  console.log("\n🎉 ALL 38 COMPREHENSIVE VERIFICATION TESTS PASSED NOMINAL! 🎉");
+  // 39. TEST CLOSED-BROWSER W3C WEB PUSH NOTIFICATIONS & VAPID GATE (/api/v1/push)
+  console.log("\n39. TEST CLOSED-BROWSER W3C WEB PUSH NOTIFICATIONS & VAPID GATE (/api/v1/push)");
+  const vapidRes = await fetch(`${BASE_URL}/api/v1/push/vapid-public-key`);
+  if (!vapidRes.ok) {
+    throw new Error(`Failed to fetch VAPID public key: ${vapidRes.status}`);
+  }
+  const vapidData = await vapidRes.json();
+  if (!vapidData.publicKey || typeof vapidData.publicKey !== "string" || vapidData.publicKey.length < 50) {
+    throw new Error(`Invalid VAPID public key: ${JSON.stringify(vapidData)}`);
+  }
+  console.log(`   VAPID Public Key: ${vapidData.publicKey.slice(0, 16)}... (Length: ${vapidData.publicKey.length})`);
+
+  // Test push subscription registration
+  const mockPushSubscription = {
+    endpoint: "https://fcm.googleapis.com/fcm/send/test-token-synthetic-heimdall-99",
+    keys: {
+      p256dh: "BM_test_p256dh_key_synthetic_telemetry_probe_verification_value_here",
+      auth: "test_auth_secret_99",
+    },
+  };
+  const pushSubRes = await fetch(`${BASE_URL}/api/v1/push/subscribe`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ subscription: mockPushSubscription, scope: "all" }),
+  });
+  if (!pushSubRes.ok) {
+    throw new Error(`Failed to register push subscription: ${pushSubRes.status} ${await pushSubRes.text()}`);
+  }
+  const pushSubData = await pushSubRes.json();
+  if (!pushSubData.id || pushSubData.type !== "webpush") {
+    throw new Error(`Push subscription response invalid: ${JSON.stringify(pushSubData)}`);
+  }
+  console.log(`   Registered Web Push Subscriber: ID=${pushSubData.id}, Type=${pushSubData.type}`);
+  console.log("   ✅ Closed-browser W3C Web Push notification gate & VAPID subscription verified.");
+
+  console.log("\n🎉 ALL 39 COMPREHENSIVE VERIFICATION TESTS PASSED NOMINAL! 🎉");
 
   } finally {
     if (serverInstance) {

@@ -73,6 +73,7 @@ import groupsRoutes from "./routes/groups.js";
 import subscribersRoutes from "./routes/subscribers.js";
 import maintenanceRoutes from "./routes/maintenance.js";
 import widgetRoutes from "./routes/widget.js";
+import pushRoutes from "./routes/push.js";
 import { getRssFeedHandler } from "./routes/status.js";
 
 // Root API Health Endpoint
@@ -99,6 +100,7 @@ app.get([
 
 // Mount API Routes
 app.use(["/status/widget", "/api/v1/status/widget", "/widget"], widgetRoutes);
+app.use(["/api/v1/push", "/push"], pushRoutes);
 app.use(["/api/v1/subscribers", "/subscribers"], subscribersRoutes);
 app.use(["/api/v1/maintenance", "/maintenance"], maintenanceRoutes);
 app.use("/api/v1/auth", authRoutes);

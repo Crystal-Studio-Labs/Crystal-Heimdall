@@ -13,6 +13,7 @@ import {
   Play,
   X,
   Radio,
+  Bell,
 } from "lucide-react";
 import { isAudioMuted, setAudioMuted } from "../lib/audioAlerts";
 import { setActiveTheme, TerminalTheme } from "../lib/theme";
@@ -152,6 +153,48 @@ export const CommandPalette: React.FC = () => {
         const next = !isAudioMuted();
         setAudioMuted(next);
         addToast(next ? "Audio alerts MUTED." : "Audio alerts UNMUTED.", "info");
+      },
+    },
+    {
+      id: "action-webpush",
+      category: "ACTIONS",
+      title: "ARM CLOSED-BROWSER WEB PUSH ALERTS",
+      subtitle: "Enable native system push alerts on this device",
+      icon: <Bell className="w-4 h-4 text-amber-400" />,
+      onSelect: async () => {
+        if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+          addToast("Web Push is not supported by this browser.", "error");
+          return;
+        }
+        try {
+          const permission = await Notification.requestPermission();
+          if (permission !== "granted") {
+            addToast("Permission denied for push notifications.", "error");
+            return;
+          }
+          const reg = await navigator.serviceWorker.ready;
+          const vapidRes = await fetch("/api/v1/push/vapid-public-key");
+          const { publicKey } = await vapidRes.json();
+          const padding = "=".repeat((4 - (publicKey.length % 4)) % 4);
+          const base64 = (publicKey + padding).replace(/-/g, "+").replace(/_/g, "/");
+          const rawData = window.atob(base64);
+          const outputArray = new Uint8Array(rawData.length);
+          for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+          }
+          let sub = await reg.pushManager.getSubscription();
+          if (!sub) {
+            sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: outputArray });
+          }
+          await fetch("/api/v1/push/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ subscription: sub.toJSON(), scope: "all" }),
+          });
+          addToast("Closed-browser Web Push alerts armed on this device!", "success");
+        } catch (err: any) {
+          addToast(err.message || "Failed to arm push alerts", "error");
+        }
       },
     },
 

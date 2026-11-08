@@ -4,6 +4,7 @@ import { getDb, initDb } from "../db.js";
 import { isOperatorReq } from "./auth.js";
 import { createRateLimiter } from "../rateLimiter.js";
 import { sendIncidentEmail } from "../email.js";
+import { sendWebPushNotification } from "../webpush.js";
 
 const router = Router();
 
@@ -15,7 +16,16 @@ const subscribeLimiter = createRateLimiter({
 });
 
 // Helper to mask target for privacy
-export function maskTarget(target: string, type: "email" | "webhook"): string {
+export function maskTarget(target: string, type: "email" | "webhook" | "webpush"): string {
+  if (type === "webpush") {
+    try {
+      const parsed = JSON.parse(target);
+      const url = new URL(parsed.endpoint);
+      return `Web Push (${url.hostname})`;
+    } catch {
+      return "Web Push (Browser Device)";
+    }
+  }
   if (type === "email") {
     const parts = target.split("@");
     if (parts.length !== 2) return "***";
@@ -276,6 +286,32 @@ export async function notifySubscribers(incident: {
           console.warn(`[SUBSCRIBER EMAIL ERROR] (${sub.id}):`, err.message);
         });
         delivered++;
+      } else if (sub.type === "webpush") {
+        // Dispatched via W3C Web Push (delivered even when browser/tab is closed)
+        try {
+          const subscription = JSON.parse(sub.target);
+          sendWebPushNotification(subscription, {
+            title: `[${incident.severity.toUpperCase()}] ${incident.title}`,
+            body: incident.message || `Sentinel detected an anomaly with ${incident.serviceName || "Monitored Target"}.`,
+            tag: `incident-${incident.id}`,
+            url: `/incidents/${incident.id}`,
+            severity: incident.severity,
+            incidentId: incident.id,
+          }).then((res) => {
+            if (res.expired) {
+              // Automatically prune expired subscription
+              db.execute({
+                sql: "UPDATE subscribers SET is_active = 0 WHERE id = ?",
+                args: [sub.id],
+              }).catch(() => {});
+            }
+          }).catch((err) => {
+            console.warn(`[WEB PUSH DISPATCH ERROR] (${sub.id}):`, err.message);
+          });
+          delivered++;
+        } catch (err: any) {
+          console.warn(`[INVALID PUSH SUBSCRIPTION TARGET] (${sub.id}):`, err.message);
+        }
       }
     }
 
