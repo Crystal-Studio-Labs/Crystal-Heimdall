@@ -19,6 +19,8 @@ import {
   Server
 } from "lucide-react";
 import HeartbeatBars, { HistoryBlock } from "../components/HeartbeatBars";
+import LatencyHeatmap from "../components/LatencyHeatmap";
+import IncidentStepper from "../components/IncidentStepper";
 import { useToast } from "../lib/ToastContext";
 import { isOperatorAuthenticated, getSessionInfo } from "../lib/api";
 import { isAudioMuted, setAudioMuted, playTestSound } from "../lib/audioAlerts";
@@ -630,6 +632,9 @@ export default function ServiceDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* HOURLY LATENCY PERCENTILE MATRIX & 24H HEATMAP */}
+        <LatencyHeatmap telemetry={telemetry} serviceName={service.name} />
 
         {/* PROJECT INCIDENT HISTORY CARD */}
         <div className="p-5 bg-[#0b0f17] border-2 border-zinc-800 shadow-[4px_4px_0px_#000] space-y-4">

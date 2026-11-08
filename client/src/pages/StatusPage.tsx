@@ -24,6 +24,7 @@ import {
 import HeartbeatBars, { HistoryBlock } from "../components/HeartbeatBars";
 import SubscribeModal from "../components/SubscribeModal";
 import MaintenanceBanner, { MaintenanceItem } from "../components/MaintenanceBanner";
+import IncidentStepper from "../components/IncidentStepper";
 import { useToast } from "../lib/ToastContext";
 import { isAudioMuted, setAudioMuted, playCriticalAlarm, playTestSound } from "../lib/audioAlerts";
 import { isOperatorAuthenticated, clearAuthToken, getSessionInfo } from "../lib/api";
@@ -126,9 +127,28 @@ export default function StatusPage() {
     }
   };
 
-  // Initial load
+  // Initial load & real-time SSE stream
   useEffect(() => {
     fetchStatus();
+
+    let evtSource: EventSource | null = null;
+    try {
+      evtSource = new EventSource("/api/v1/status/stream");
+      evtSource.addEventListener("status_update", () => {
+        fetchStatus();
+      });
+      evtSource.onerror = () => {
+        // SSE disconnected, fallback gracefully to periodic interval
+      };
+    } catch {
+      // EventSource not supported
+    }
+
+    return () => {
+      if (evtSource) {
+        evtSource.close();
+      }
+    };
   }, []);
 
   // 1-second cadence timer for background auto-sync countdown (every 30s)
@@ -558,6 +578,7 @@ export default function StatusPage() {
                     {inc.message}
                   </p>
                 )}
+                <IncidentStepper currentStatus={inc.status} firstSeenAt={inc.first_seen_at} compact={true} />
                 <div className="pt-1">
                   <Link 
                     to={`/incidents/${inc.id}`}

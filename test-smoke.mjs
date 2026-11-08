@@ -164,8 +164,8 @@ async function runSmokeTests() {
     const { getDb, initDb } = await import("./dist-server/db.js");
     await initDb();
     const db = getDb();
-    const res = await db.execute("SELECT value FROM operator_auth WHERE key = 'totp_secret'");
-    secret = String(res.rows[0].value);
+    const { getTotpSecret } = await import("./dist-server/routes/auth.js");
+    secret = await getTotpSecret();
   }
 
   const realTotpCode = authenticator.generate(secret);
@@ -1141,7 +1141,160 @@ async function runSmokeTests() {
   }
   console.log("   ✅ Embeddable brutalist status card verified with live SLA and monitored count.");
 
-  console.log("\n🎉 ALL 33 COMPREHENSIVE VERIFICATION TESTS PASSED NOMINAL! 🎉");
+  // 34. TEST AES-256-GCM CRYPTOGRAPHIC HARDENING & SELF-HEALING MIGRATION
+  console.log("\n34. TEST AES-256-GCM CRYPTOGRAPHIC HARDENING & SELF-HEALING MIGRATION");
+  const { encryptSecret, decryptSecret } = await import("./dist-server/crypto.js");
+  const testSecret = "K7L5M9Q2R4T6V8X0";
+  const encrypted = encryptSecret(testSecret);
+  if (!encrypted.startsWith("enc:v1:")) {
+    throw new Error(`Encrypted secret missing 'enc:v1:' prefix: ${encrypted}`);
+  }
+  const parts = encrypted.slice("enc:v1:".length).split(":");
+  if (parts.length !== 3 || parts[0].length !== 24 || parts[1].length !== 32) {
+    throw new Error(`Encrypted secret format invalid: ${encrypted}`);
+  }
+  const decrypted = decryptSecret(encrypted);
+  if (decrypted !== testSecret) {
+    throw new Error(`Decrypted secret mismatch! Expected '${testSecret}', got '${decrypted}'`);
+  }
+  // Verify legacy fallback for unencrypted strings
+  const fallback = decryptSecret("LEGACY_PLAINTEXT_SECRET");
+  if (fallback !== "LEGACY_PLAINTEXT_SECRET") {
+    throw new Error("Legacy fallback decryption failed!");
+  }
+  // Verify database row for totp_secret is encrypted at rest
+  const { getDb, initDb } = await import("./dist-server/db.js");
+  await initDb();
+  const db = getDb();
+  const dbSecretRes = await db.execute("SELECT value FROM operator_auth WHERE key = 'totp_secret'");
+  if (dbSecretRes.rows.length > 0) {
+    const storedVal = String(dbSecretRes.rows[0].value);
+    if (!storedVal.startsWith("enc:v1:")) {
+      throw new Error(`Stored TOTP secret in DB is NOT encrypted at rest! Value: ${storedVal}`);
+    }
+    console.log(`   Stored DB TOTP Secret: ${storedVal.slice(0, 18)}... (AES-256-GCM confirmed)`);
+  }
+  console.log("   ✅ AES-256-GCM authenticated encryption at rest verified for operator credentials.");
+
+  // 35. TEST TRANSACTIONAL EMAIL DRIVER & CAN-SPAM COMPLIANCE
+  console.log("\n35. TEST TRANSACTIONAL EMAIL DRIVER & CAN-SPAM COMPLIANCE");
+  const { generateBrutalistHtml, sendIncidentEmail } = await import("./dist-server/email.js");
+  const testEmailHtml = generateBrutalistHtml({
+    to: "sentinel-audit@crystalstudiolabs.org",
+    token: "tok-test-auth-verify-99",
+    subscriberId: "sub-audit-01",
+    incidentId: "inc-test-email-01",
+    subject: "Test Outage Alert",
+    title: "Primary LibSQL Cluster Failover Test",
+    severity: "critical",
+    status: "outage",
+    serviceName: "Production Cluster Edge",
+    message: "Automated latency threshold breached during canary deployment.",
+  });
+
+  if (!testEmailHtml.includes("CRYSTAL HEIMDALL // FLEET INCIDENT TELEMETRY")) {
+    throw new Error("Brutalist email HTML missing header branding!");
+  }
+  if (!testEmailHtml.includes("/api/v1/subscribers/sub-audit-01?token=tok-test-auth-verify-99")) {
+    throw new Error("Brutalist email HTML missing 1-click unsubscribe conduit link!");
+  }
+  if (!testEmailHtml.includes("#ef4444")) {
+    throw new Error("Critical email HTML missing high-contrast crimson severity token!");
+  }
+
+  const emailDispatchResult = await sendIncidentEmail({
+    to: "test-receiver@crystalstudiolabs.org",
+    token: "tok-simulated-99",
+    subscriberId: "sub-sim-99",
+    incidentId: "inc-sim-99",
+    subject: "Automated Smoke Test Incident",
+    title: "Test Ingestion",
+    severity: "warning",
+    status: "degraded",
+  });
+  if (!emailDispatchResult.success) {
+    throw new Error(`Email driver dispatch returned failure: ${JSON.stringify(emailDispatchResult)}`);
+  }
+  console.log(`   Email Dispatch Provider: ${emailDispatchResult.provider} (status: ${emailDispatchResult.success})`);
+  console.log("   ✅ Transactional email delivery driver & brutalist HTML templates verified.");
+
+  // 36. TEST SERVER-SENT EVENTS (SSE) STREAM (/api/v1/status/stream)
+  console.log("\n36. TEST SERVER-SENT EVENTS (SSE) STREAM (/api/v1/status/stream)");
+  const sseController = new AbortController();
+  const sseTimeout = setTimeout(() => sseController.abort(), 3000);
+  const sseRes = await fetch(`${BASE_URL}/api/v1/status/stream`, { signal: sseController.signal });
+  clearTimeout(sseTimeout);
+
+  if (sseRes.status !== 200) {
+    throw new Error(`SSE stream responded with status: ${sseRes.status}`);
+  }
+  const sseContentType = sseRes.headers.get("content-type") || "";
+  if (!sseContentType.includes("text/event-stream")) {
+    throw new Error(`SSE stream Content-Type was '${sseContentType}', expected 'text/event-stream'`);
+  }
+
+  // Read initial chunk
+  const reader = sseRes.body.getReader();
+  const { value } = await reader.read();
+  const initialChunk = new TextDecoder().decode(value);
+  reader.cancel();
+
+  if (!initialChunk.includes("event: init") || !initialChunk.includes('"connected":true')) {
+    throw new Error(`SSE stream failed to emit initial connected event! Chunk: ${initialChunk}`);
+  }
+  console.log("   ✅ Server-Sent Events (SSE) telemetry stream verified with sub-second init payload.");
+
+  // 37. TEST AUTOMATED INCIDENT POSTMORTEM GENERATOR (/api/v1/incidents/:id/postmortem)
+  console.log("\n37. TEST AUTOMATED INCIDENT POSTMORTEM GENERATOR (/api/v1/incidents/:id/postmortem)");
+  const incListRes = await fetch(`${BASE_URL}/api/v1/incidents`);
+  const incListData = await incListRes.json();
+  if (!incListData.incidents || incListData.incidents.length === 0) {
+    throw new Error("No incidents found to test postmortem generator!");
+  }
+  const sampleInc = incListData.incidents[0];
+  const postmortemRes = await fetch(`${BASE_URL}/api/v1/incidents/${sampleInc.id}/postmortem`);
+  if (!postmortemRes.ok) {
+    throw new Error(`Postmortem API returned ${postmortemRes.status}: ${await postmortemRes.text()}`);
+  }
+  const postmortemData = await postmortemRes.json();
+  if (!postmortemData.postmortemMarkdown || !postmortemData.mttr) {
+    throw new Error(`Postmortem JSON response missing markdown or MTTR: ${JSON.stringify(postmortemData)}`);
+  }
+  if (!postmortemData.postmortemMarkdown.includes("# INCIDENT POSTMORTEM REPORT") ||
+      !postmortemData.postmortemMarkdown.includes("Root Cause Analysis (RCA)") ||
+      !postmortemData.postmortemMarkdown.includes("Chronological Timeline of Events")) {
+    throw new Error("Postmortem Markdown missing required report sections!");
+  }
+  console.log(`   Generated Postmortem for ${sampleInc.id}: MTTR=${postmortemData.mttr}, Length=${postmortemData.postmortemMarkdown.length} chars`);
+
+  // Test Raw Markdown Download
+  const downloadRes = await fetch(`${BASE_URL}/api/v1/incidents/${sampleInc.id}/postmortem?download=1`);
+  const downloadType = downloadRes.headers.get("content-type") || "";
+  const downloadDisp = downloadRes.headers.get("content-disposition") || "";
+  if (!downloadType.includes("text/markdown") || !downloadDisp.includes("attachment; filename=")) {
+    throw new Error(`Raw postmortem download headers invalid: Content-Type=${downloadType}, Content-Disposition=${downloadDisp}`);
+  }
+  console.log("   ✅ Automated Incident Postmortem Generator verified with MTTR calculation and Markdown export.");
+
+  // 38. TEST CRT TERMINAL THEMES & CLIENT ASSET TOKENS
+  console.log("\n38. TEST CRT TERMINAL THEMES & CLIENT ASSET TOKENS");
+  const fs = await import("fs");
+  const path = await import("path");
+  const assetsDir = path.resolve("dist-client/assets");
+  const assetFiles = fs.readdirSync(assetsDir);
+  const cssFile = assetFiles.find((f) => f.endsWith(".css"));
+  if (!cssFile) {
+    throw new Error("Production CSS bundle not found in dist-client/assets!");
+  }
+  const cssContent = fs.readFileSync(path.join(assetsDir, cssFile), "utf8");
+  if (!cssContent.includes("data-theme=amber-crt") ||
+      !cssContent.includes("data-theme=matrix-emerald") ||
+      !cssContent.includes("data-theme=paper-light")) {
+    throw new Error("Production CSS bundle missing CRT terminal theme tokens!");
+  }
+  console.log("   ✅ CRT terminal theme tokens (Amber CRT, Matrix Emerald, Paper Light) verified in stylesheet.");
+
+  console.log("\n🎉 ALL 38 COMPREHENSIVE VERIFICATION TESTS PASSED NOMINAL! 🎉");
 
   } finally {
     if (serverInstance) {

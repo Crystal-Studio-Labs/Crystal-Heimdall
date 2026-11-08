@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import SEO from "../components/SEO";
+import IncidentStepper from "../components/IncidentStepper";
 import { 
   Flame, 
   AlertTriangle, 
@@ -291,6 +292,12 @@ export default function IncidentsPage() {
                     <p className="text-xs text-zinc-300 font-sans leading-relaxed bg-black/60 p-3 border border-zinc-800/80">
                       {inc.message || "Automated probe reported consecutive threshold failure."}
                     </p>
+                    <IncidentStepper 
+                      currentStatus={inc.status} 
+                      firstSeenAt={inc.created_at} 
+                      resolvedAt={inc.resolved_at} 
+                      compact={true} 
+                    />
                   </div>
 
                   {/* Action Link to Detail / Postmortem */}

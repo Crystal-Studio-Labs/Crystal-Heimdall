@@ -17,6 +17,51 @@ export function invalidateStatusCache() {
   statusCache = null;
 }
 
+// Set of active SSE streaming connections
+const sseClients = new Set<Response>();
+
+export function broadcastStatusUpdate(payload?: any) {
+  invalidateStatusCache();
+  const data = JSON.stringify(payload || { event: "status_update", timestamp: Date.now() });
+  for (const client of sseClients) {
+    try {
+      client.write(`event: status_update\ndata: ${data}\n\n`);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
+
+// Keep-alive heartbeat interval every 15s
+setInterval(() => {
+  if (sseClients.size === 0) return;
+  const ping = `event: heartbeat\ndata: ${JSON.stringify({ timestamp: Date.now() })}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.write(ping);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}, 15000);
+
+// GET /stream - Real-time Server-Sent Events stream for instant status updates
+router.get("/stream", (req: Request, res: Response) => {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+
+  res.write(`event: init\ndata: ${JSON.stringify({ connected: true, timestamp: Date.now() })}\n\n`);
+  sseClients.add(res);
+
+  req.on("close", () => {
+    sseClients.delete(res);
+  });
+});
+
 // Rate Limiter: Max 60 requests per minute per IP for public status queries
 const statusRateLimiter = createRateLimiter({
   windowMs: 60 * 1000,

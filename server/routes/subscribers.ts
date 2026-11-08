@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { getDb, initDb } from "../db.js";
 import { isOperatorReq } from "./auth.js";
 import { createRateLimiter } from "../rateLimiter.js";
+import { sendIncidentEmail } from "../email.js";
 
 const router = Router();
 
@@ -259,8 +260,21 @@ export async function notifySubscribers(incident: {
         });
         delivered++;
       } else if (sub.type === "email") {
-        // Dispatched to email conduit (logged or integrated with SMTP / Resend if keys present)
-        console.log(`[SUBSCRIBER EMAIL DISPATCH] Alert '${incident.title}' queued for recipient: ${maskTarget(sub.target, "email")}`);
+        // Dispatched via transactional email driver (Resend / Dry-Run)
+        sendIncidentEmail({
+          to: sub.target,
+          token: sub.token,
+          subscriberId: sub.id,
+          incidentId: incident.id,
+          subject: `[HEIMDALL // ${incident.severity.toUpperCase()}] ${incident.title}`,
+          title: incident.title,
+          severity: incident.severity,
+          status: incident.status,
+          serviceName: incident.serviceName,
+          message: incident.message,
+        }).catch((err) => {
+          console.warn(`[SUBSCRIBER EMAIL ERROR] (${sub.id}):`, err.message);
+        });
         delivered++;
       }
     }

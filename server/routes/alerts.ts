@@ -3,6 +3,7 @@ import { getDb, initDb } from "../db.js";
 import { checkAndRegisterAlert } from "../deduplicator.js";
 import { sendTelegramAlert, sendDiscordWebhookAlert } from "../dispatcher.js";
 import { notifySubscribers } from "./subscribers.js";
+import { broadcastStatusUpdate } from "./status.js";
 
 const router = Router();
 
@@ -114,6 +115,8 @@ router.post("/", async (req: Request, res: Response) => {
         status: "active",
       }),
     ]);
+
+    broadcastStatusUpdate({ event: "incident_created", incidentId: incId, serviceName: service.name, severity });
 
     return res.json({
       status: "dispatched",

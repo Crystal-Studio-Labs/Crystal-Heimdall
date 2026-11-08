@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import SEO from "../components/SEO";
+import IncidentStepper from "../components/IncidentStepper";
 import { 
   ArrowLeft, 
   Flame, 
@@ -16,7 +17,12 @@ import {
   Layers,
   Share2,
   Send,
-  Plus
+  Plus,
+  FileText,
+  Download,
+  Copy,
+  Check,
+  X
 } from "lucide-react";
 import { useToast } from "../lib/ToastContext";
 import { isOperatorAuthenticated } from "../lib/api";
@@ -84,6 +90,41 @@ export default function IncidentDetailPage() {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(window.location.href);
       toast.success("Incident link copied to clipboard!");
+    }
+  };
+
+  const [showPostmortemModal, setShowPostmortemModal] = useState(false);
+  const [postmortemData, setPostmortemData] = useState<{ markdown: string; mttr: string; durationMinutes: number } | null>(null);
+  const [isGeneratingPostmortem, setIsGeneratingPostmortem] = useState(false);
+  const [copiedPostmortem, setCopiedPostmortem] = useState(false);
+
+  const handleGeneratePostmortem = async () => {
+    if (!id) return;
+    setIsGeneratingPostmortem(true);
+    try {
+      const res = await fetch(`/api/v1/incidents/${id}/postmortem`);
+      if (!res.ok) throw new Error("Failed to generate postmortem");
+      const data = await res.json();
+      setPostmortemData({
+        markdown: data.postmortemMarkdown,
+        mttr: data.mttr,
+        durationMinutes: data.durationMinutes,
+      });
+      setShowPostmortemModal(true);
+      toast.success("RCA postmortem generated from telemetry!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to generate postmortem");
+    } finally {
+      setIsGeneratingPostmortem(false);
+    }
+  };
+
+  const handleCopyPostmortem = () => {
+    if (postmortemData?.markdown && navigator.clipboard) {
+      navigator.clipboard.writeText(postmortemData.markdown);
+      setCopiedPostmortem(true);
+      toast.success("Markdown postmortem copied to clipboard!");
+      setTimeout(() => setCopiedPostmortem(false), 2000);
     }
   };
 
@@ -174,13 +215,24 @@ export default function IncidentDetailPage() {
             <span>[ BACK TO INCIDENT LEDGER ]</span>
           </Link>
 
-          <button
-            onClick={handleShare}
-            className="px-3 py-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700 text-xs font-bold uppercase transition flex items-center gap-1.5 shadow-[2px_2px_0px_#000]"
-          >
-            <Share2 className="w-3 h-3" />
-            <span>SHARE REPORT</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleGeneratePostmortem}
+              disabled={isGeneratingPostmortem}
+              className="px-3 py-1 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 hover:text-white border border-cyan-600 text-xs font-bold uppercase transition flex items-center gap-1.5 shadow-[2px_2px_0px_#000]"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>{isGeneratingPostmortem ? "GENERATING..." : "RCA POSTMORTEM"}</span>
+            </button>
+
+            <button
+              onClick={handleShare}
+              className="px-3 py-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700 text-xs font-bold uppercase transition flex items-center gap-1.5 shadow-[2px_2px_0px_#000]"
+            >
+              <Share2 className="w-3 h-3" />
+              <span>SHARE REPORT</span>
+            </button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -264,6 +316,16 @@ export default function IncidentDetailPage() {
                   <span className="text-xs text-white font-bold">× {eventCount}</span>
                   <span className="text-[9px] text-zinc-500 block">Deduplicated</span>
                 </div>
+              </div>
+
+              {/* Canonical 4-Stage Lifecycle Stepper */}
+              <div className="pt-2">
+                <IncidentStepper
+                  currentStatus={incident.status}
+                  updates={incident.updates}
+                  firstSeenAt={startedAt}
+                  resolvedAt={incident.resolved_at}
+                />
               </div>
             </div>
 
@@ -412,6 +474,69 @@ export default function IncidentDetailPage() {
   diagnostic_message: incident.message
 }, null, 2)}
               </pre>
+            </div>
+          </div>
+        )}
+
+        {/* RCA Postmortem Modal */}
+        {showPostmortemModal && postmortemData && (
+          <div
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setShowPostmortemModal(false)}
+          >
+            <div
+              className="w-full max-w-3xl brutal-panel border-2 border-cyan-500 shadow-[8px_8px_0px_#000000] bg-[#070a0f] max-h-[85vh] flex flex-col overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-5 py-3.5 border-b-2 border-zinc-800 bg-[#030712]">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-cyan-400" />
+                  <span className="text-xs font-mono font-bold tracking-wider text-white uppercase">
+                    [ AUTOMATED ROOT CAUSE ANALYSIS POSTMORTEM ]
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 bg-emerald-950 border border-emerald-500 text-emerald-400 uppercase font-bold">
+                    MTTR: {postmortemData.mttr}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowPostmortemModal(false)}
+                  className="text-zinc-500 hover:text-white p-1"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Modal Body / Markdown View */}
+              <div className="flex-1 overflow-y-auto p-5 bg-[#0b0f17]">
+                <pre className="font-mono text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed select-all">
+                  {postmortemData.markdown}
+                </pre>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-t-2 border-zinc-800 bg-[#030712]">
+                <div className="text-[10px] font-mono text-zinc-500">
+                  EXPORT FORMAT: GITHUB FLAVORED MARKDOWN (.MD)
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleCopyPostmortem}
+                    className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white text-xs font-mono font-bold uppercase flex items-center gap-1.5"
+                  >
+                    {copiedPostmortem ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedPostmortem ? "COPIED" : "COPY MD"}</span>
+                  </button>
+                  <a
+                    href={`/api/v1/incidents/${id}/postmortem?download=1`}
+                    download={`postmortem-${id}.md`}
+                    className="px-3 py-1.5 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500 text-cyan-300 hover:text-white text-xs font-mono font-bold uppercase flex items-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>DOWNLOAD .MD</span>
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
         )}

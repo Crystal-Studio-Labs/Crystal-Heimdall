@@ -4,6 +4,7 @@ import { authenticator } from "otplib";
 import qrcode from "qrcode";
 import { getDb, initDb } from "../db.js";
 import { createRateLimiter } from "../rateLimiter.js";
+import { encryptSecret, decryptSecret } from "../crypto.js";
 
 const router = Router();
 export const JWT_SECRET = process.env.JWT_SECRET || "crystal_heimdall_super_secret_jwt_key_2026";
@@ -41,7 +42,7 @@ export async function is2FaLocked(): Promise<boolean> {
   return res.rows.length > 0 && String(res.rows[0].value) === "1";
 }
 
-// Get or initialize TOTP secret
+// Get or initialize TOTP secret (Encrypted at rest with AES-256-GCM)
 export async function getTotpSecret(): Promise<string> {
   // 1. Environment variable override (highest priority, locked)
   if (process.env.TOTP_SECRET && process.env.TOTP_SECRET.trim().length > 0) {
@@ -51,14 +52,25 @@ export async function getTotpSecret(): Promise<string> {
   const db = getDb();
   const res = await db.execute("SELECT value FROM operator_auth WHERE key = 'totp_secret'");
   if (res.rows.length > 0 && res.rows[0].value) {
-    return String(res.rows[0].value);
+    const rawVal = String(res.rows[0].value);
+    const secret = decryptSecret(rawVal);
+    // Self-healing migration: if stored in legacy plaintext, re-encrypt in place immediately
+    if (!rawVal.startsWith("enc:v1:")) {
+      const encrypted = encryptSecret(secret);
+      await db.execute({
+        sql: "UPDATE operator_auth SET value = ? WHERE key = 'totp_secret'",
+        args: [encrypted],
+      });
+    }
+    return secret;
   }
 
-  // Generate new secret for initial setup
+  // Generate new secret for initial setup and encrypt at rest
   const newSecret = authenticator.generateSecret();
+  const encrypted = encryptSecret(newSecret);
   await db.execute({
     sql: "INSERT OR REPLACE INTO operator_auth (key, value) VALUES ('totp_secret', ?)",
-    args: [newSecret],
+    args: [encrypted],
   });
   return newSecret;
 }

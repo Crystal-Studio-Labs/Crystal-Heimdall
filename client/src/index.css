@@ -236,3 +236,59 @@ body {
   outline: 2px solid #00d9ff;
   outline-offset: 1px;
 }
+
+/* CRT & BRUTALIST TERMINAL THEMES */
+[data-theme="amber-crt"] body {
+  background-color: #0d0a00 !important;
+  color: #fbbf24 !important;
+  background-image: 
+    linear-gradient(rgba(245, 158, 11, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(245, 158, 11, 0.05) 1px, transparent 1px) !important;
+}
+[data-theme="amber-crt"] .brutal-panel,
+[data-theme="amber-crt"] .brutal-card,
+[data-theme="amber-crt"] .glass-panel,
+[data-theme="amber-crt"] .glass-card {
+  background-color: #1a1403 !important;
+  border-color: #b45309 !important;
+  color: #fbbf24 !important;
+}
+
+[data-theme="matrix-emerald"] body {
+  background-color: #020d06 !important;
+  color: #34d399 !important;
+  background-image: 
+    linear-gradient(rgba(16, 185, 129, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 185, 129, 0.05) 1px, transparent 1px) !important;
+}
+[data-theme="matrix-emerald"] .brutal-panel,
+[data-theme="matrix-emerald"] .brutal-card,
+[data-theme="matrix-emerald"] .glass-panel,
+[data-theme="matrix-emerald"] .glass-card {
+  background-color: #041f0e !important;
+  border-color: #059669 !important;
+  color: #34d399 !important;
+}
+
+[data-theme="paper-light"] body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  background-image: 
+    linear-gradient(rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.05) 1px, transparent 1px) !important;
+}
+[data-theme="paper-light"] .brutal-panel,
+[data-theme="paper-light"] .brutal-card,
+[data-theme="paper-light"] .glass-panel,
+[data-theme="paper-light"] .glass-card {
+  background-color: #ffffff !important;
+  border-color: #0f172a !important;
+  box-shadow: 4px 4px 0px #0f172a !important;
+  color: #0f172a !important;
+}
+[data-theme="paper-light"] .brutal-input,
+[data-theme="paper-light"] .glass-input {
+  background-color: #f1f5f9 !important;
+  border-color: #0f172a !important;
+  color: #0f172a !important;
+}

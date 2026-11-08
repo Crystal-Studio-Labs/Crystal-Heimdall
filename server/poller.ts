@@ -4,6 +4,7 @@ import { sendTelegramAlert, sendDiscordWebhookAlert } from "./dispatcher.js";
 import { checkTcpPort, checkSslExpiry, parseTargetAddress } from "./probers.js";
 import { notifySubscribers } from "./routes/subscribers.js";
 import { isTargetInMaintenance } from "./routes/maintenance.js";
+import { broadcastStatusUpdate } from "./routes/status.js";
 
 export interface PollResult {
   polledCount: number;
@@ -318,6 +319,9 @@ export async function runPollCycle(): Promise<PollResult> {
       }
     }
   }
+
+  // Trigger real-time status push to all active SSE subscribers
+  broadcastStatusUpdate({ event: "poll_completed", summary: result });
 
   return result;
 }
