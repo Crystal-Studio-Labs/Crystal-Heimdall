@@ -16,7 +16,9 @@ import {
   Mail,
   LayoutDashboard,
   LogOut,
-  Rss
+  Rss,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import HeartbeatBars, { HistoryBlock } from "../components/HeartbeatBars";
 import { useToast } from "../lib/ToastContext";
@@ -76,6 +78,8 @@ export default function StatusPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [nextSyncSeconds, setNextSyncSeconds] = useState(30);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "healthy" | "warning" | "critical" | "maintenance">("all");
+  const [expandedIncidents, setExpandedIncidents] = useState<Record<string, boolean>>({});
   const prevStatusRef = useRef<string | null>(null);
 
   const fetchStatus = async (): Promise<boolean> => {
@@ -164,8 +168,23 @@ export default function StatusPage() {
   const announcementType = settings.announcement_type || "none";
   const announcementBanner = settings.announcement_banner || "";
 
-  // Filter Services by search query
+  // Status fleet counts
+  const totalCount = data.services.length;
+  const healthyCount = data.services.filter((s) => s.status === "healthy" && s.is_maintenance !== 1).length;
+  const warningCount = data.services.filter((s) => s.status === "warning").length;
+  const criticalCount = data.services.filter((s) => s.status === "critical").length;
+  const maintenanceCount = data.services.filter((s) => s.status === "maintenance" || s.is_maintenance === 1).length;
+
+  // Filter Services by search query and status filter
   const filteredServices = data.services.filter((s) => {
+    // 1. Status Filter
+    const isMaint = s.status === "maintenance" || s.is_maintenance === 1;
+    if (statusFilter === "healthy" && (s.status !== "healthy" || isMaint)) return false;
+    if (statusFilter === "warning" && s.status !== "warning") return false;
+    if (statusFilter === "critical" && s.status !== "critical") return false;
+    if (statusFilter === "maintenance" && !isMaint) return false;
+
+    // 2. Search query filter
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return s.name.toLowerCase().includes(q) ||
@@ -331,21 +350,50 @@ export default function StatusPage() {
         )}
 
         {/* 1. MONITORED SERVICES FLEET (AT TOP UNDER HERO) */}
-        {/* FILTER BAR */}
-        <div className="flex items-center justify-between gap-3 pt-2">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-zinc-500" />
-            <input
-              type="text"
-              placeholder="Search services..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full p-2 pl-8 bg-black border border-zinc-700 text-xs text-white placeholder-zinc-500 outline-none focus:border-cyan-400 font-mono"
-            />
+        {/* FILTER BAR & QUICK TRIAGE ROCKERS */}
+        <div className="space-y-3 pt-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-zinc-500" />
+              <input
+                type="text"
+                placeholder="Search services, groups, protocols..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full p-2 pl-8 bg-black border border-zinc-700 text-xs text-white placeholder-zinc-500 outline-none focus:border-cyan-400 font-mono"
+              />
+            </div>
+
+            <div className="flex items-center space-x-2 text-[10px] text-zinc-500 uppercase font-mono self-end sm:self-auto">
+              <span>Showing {filteredServices.length} of {totalCount} Targets</span>
+            </div>
           </div>
 
-          <div className="flex items-center space-x-2 text-[10px] text-zinc-500 uppercase font-mono">
-            <span>{filteredServices.length} Monitored Services</span>
+          {/* QUICK STATUS FILTER ROCKERS */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[
+              { id: "all", label: "ALL", count: totalCount, activeColor: "bg-zinc-800 border-zinc-400 text-white" },
+              { id: "healthy", label: "OPERATIONAL", count: healthyCount, activeColor: "bg-emerald-950/90 border-emerald-400 text-emerald-300" },
+              { id: "warning", label: "DEGRADED", count: warningCount, activeColor: "bg-amber-950/90 border-amber-400 text-amber-300" },
+              { id: "critical", label: "OUTAGES", count: criticalCount, activeColor: "bg-rose-950/90 border-rose-500 text-rose-300" },
+              { id: "maintenance", label: "MAINTENANCE", count: maintenanceCount, activeColor: "bg-sky-950/90 border-sky-400 text-sky-300" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setStatusFilter(tab.id as any)}
+                className={`px-2.5 py-1 text-[11px] font-mono font-bold uppercase border transition flex items-center gap-1.5 shadow-[1px_1px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] ${
+                  statusFilter === tab.id
+                    ? tab.activeColor
+                    : "bg-black/60 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700"
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span className="text-[10px] px-1 py-0.2 bg-black/80 border border-current/30">
+                  {tab.count}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 
@@ -362,13 +410,29 @@ export default function StatusPage() {
           ) : (
             Object.entries(groupedServices).map(([group, svcs]) => (
               <div key={group} className="space-y-2">
-                {/* Group Header */}
+                {/* Group Header with Micro-Status Counts */}
                 <div className="flex items-center justify-between px-1">
-                  <span className="text-xs font-black text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <div className="flex items-center space-x-2">
                     <span className="w-1.5 h-3 bg-cyan-400 inline-block" />
-                    <span>{group}</span>
-                    <span className="text-zinc-500 text-[10px] font-normal">({svcs.length})</span>
-                  </span>
+                    <span className="text-xs font-black text-zinc-200 uppercase tracking-wider">{group}</span>
+                    <div className="flex items-center gap-1 text-[10px] font-mono">
+                      <span className="text-zinc-500 font-normal">({svcs.length})</span>
+                      {(() => {
+                        const gOk = svcs.filter((s) => s.status === "healthy" && s.is_maintenance !== 1).length;
+                        const gWarn = svcs.filter((s) => s.status === "warning").length;
+                        const gCrit = svcs.filter((s) => s.status === "critical").length;
+                        const gMaint = svcs.filter((s) => s.status === "maintenance" || s.is_maintenance === 1).length;
+                        return (
+                          <>
+                            {gOk > 0 && <span className="text-emerald-400 font-bold ml-1">• {gOk} OK</span>}
+                            {gWarn > 0 && <span className="text-amber-400 font-bold ml-1">• {gWarn} WARN</span>}
+                            {gCrit > 0 && <span className="text-rose-400 font-bold ml-1">• {gCrit} DOWN</span>}
+                            {gMaint > 0 && <span className="text-sky-400 font-bold ml-1">• {gMaint} MAINT</span>}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
                   <span className="text-[10px] text-zinc-500 uppercase font-mono">
                     30-Day Availability
                   </span>
@@ -505,37 +569,83 @@ export default function StatusPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {resolvedIncidents.slice(0, 5).map((inc) => (
-                  <div 
-                    key={inc.id} 
-                    className="p-3 bg-[#0b0f17] border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:border-zinc-700 transition"
-                  >
-                    <div className="space-y-0.5 min-w-0">
-                      <div className="flex items-center space-x-2">
-                        <span className="px-1.5 py-0.5 text-[9px] font-black uppercase bg-emerald-950 border border-emerald-500 text-emerald-400 shrink-0">
-                          [RESOLVED]
-                        </span>
-                        <span className="font-bold text-white truncate">{inc.title}</span>
+                {resolvedIncidents.slice(0, 5).map((inc: any) => {
+                  const isExpanded = !!expandedIncidents[inc.id];
+                  const updatesCount = inc.updates?.length || 0;
+
+                  return (
+                    <div 
+                      key={inc.id} 
+                      className="p-3 bg-[#0b0f17] border border-zinc-800 space-y-2 text-xs hover:border-zinc-700 transition"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="space-y-0.5 min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <span className="px-1.5 py-0.5 text-[9px] font-black uppercase bg-emerald-950 border border-emerald-500 text-emerald-400 shrink-0">
+                              [RESOLVED]
+                            </span>
+                            <span className="font-bold text-white truncate">{inc.title}</span>
+                          </div>
+                          {inc.message && (
+                            <p className="text-zinc-400 text-[11px] font-sans truncate max-w-lg">
+                              {inc.message}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-2.5 shrink-0 self-end sm:self-auto">
+                          <span className="text-[10px] text-zinc-500 font-mono">
+                            {new Date(inc.last_seen_at).toLocaleDateString()}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedIncidents((prev) => ({ ...prev, [inc.id]: !prev[inc.id] }))}
+                            className="px-2 py-0.5 bg-zinc-900 border border-zinc-700 hover:border-cyan-400 text-cyan-300 text-[10px] font-mono font-bold uppercase flex items-center gap-1 transition"
+                            title={isExpanded ? "Collapse timeline updates" : "Expand timeline updates inline"}
+                          >
+                            <span>{isExpanded ? "Hide Updates" : `Updates (${updatesCount})`}</span>
+                            {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          </button>
+                          <Link 
+                            to={`/incidents/${inc.id}`}
+                            className="text-[10px] text-zinc-400 hover:text-white uppercase font-bold"
+                          >
+                            Postmortem &rarr;
+                          </Link>
+                        </div>
                       </div>
-                      {inc.message && (
-                        <p className="text-zinc-400 text-[11px] font-sans truncate max-w-lg">
-                          {inc.message}
-                        </p>
+
+                      {/* Expandable Chronological Updates Accordion */}
+                      {isExpanded && (
+                        <div className="pt-2.5 mt-2 border-t border-zinc-800 space-y-2">
+                          <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block">
+                            // Chronological Incident Updates //
+                          </span>
+                          {inc.updates && inc.updates.length > 0 ? (
+                            <div className="pl-3 border-l-2 border-zinc-700 space-y-2">
+                              {inc.updates.map((u: any) => (
+                                <div key={u.id} className="text-xs space-y-0.5">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-[10px] text-cyan-400 font-bold uppercase font-mono">
+                                      [{u.status}]
+                                    </span>
+                                    <span className="text-[10px] text-zinc-500 font-mono">
+                                      {new Date(u.created_at).toLocaleTimeString()}
+                                    </span>
+                                  </div>
+                                  <p className="text-zinc-300 font-sans text-xs leading-relaxed">{u.message}</p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-zinc-500 font-sans italic">
+                              Incident resolved nominally. Detailed postmortem available on dedicated incident page.
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
-                    <div className="flex items-center space-x-3 shrink-0 self-end sm:self-auto">
-                      <span className="text-[10px] text-zinc-500 font-mono">
-                        {new Date(inc.last_seen_at).toLocaleDateString()}
-                      </span>
-                      <Link 
-                        to={`/incidents/${inc.id}`}
-                        className="text-[10px] text-cyan-400 hover:text-cyan-300 uppercase font-bold"
-                      >
-                        Details &rarr;
-                      </Link>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

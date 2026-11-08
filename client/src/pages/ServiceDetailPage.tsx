@@ -92,6 +92,7 @@ export default function ServiceDetailPage() {
   const [hoveredPoint, setHoveredPoint] = useState<TelemetryPoint | null>(null);
   const [muted, setMuted] = useState(isAudioMuted());
   const [nextSync, setNextSync] = useState(30);
+  const [latencyRange, setLatencyRange] = useState<"6h" | "12h" | "24h">("24h");
 
   const isAuthenticated = isOperatorAuthenticated();
   const session = getSessionInfo();
@@ -209,16 +210,34 @@ export default function ServiceDetailPage() {
   const graphW = svgWidth - padLeft - padRight;
   const graphH = svgHeight - padTop - padBottom;
 
+  const now = Date.now();
+  const rangeMs = latencyRange === "6h" ? 6 * 3600 * 1000 : latencyRange === "12h" ? 12 * 3600 * 1000 : 24 * 3600 * 1000;
+  const filteredLatencyHistory = latencyHistory.filter((p) => p.timestamp >= now - rangeMs);
+  const activeLatencyHistory = filteredLatencyHistory.length >= 2 ? filteredLatencyHistory : latencyHistory;
+
+  const currentMinLatency = activeLatencyHistory.length > 0
+    ? Math.min(...activeLatencyHistory.map((p) => p.latency_ms))
+    : service.stats.min_latency;
+  const currentAvgLatency = activeLatencyHistory.length > 0
+    ? Math.round(activeLatencyHistory.reduce((acc, p) => acc + p.latency_ms, 0) / activeLatencyHistory.length)
+    : service.stats.avg_latency;
+  const currentPeakLatency = activeLatencyHistory.length > 0
+    ? Math.max(...activeLatencyHistory.map((p) => p.latency_ms))
+    : service.stats.max_latency;
+  const sortedLatencies = [...activeLatencyHistory.map((p) => p.latency_ms)].sort((a, b) => a - b);
+  const p95Idx = Math.floor(sortedLatencies.length * 0.95);
+  const currentP95Latency = sortedLatencies.length > 0 ? sortedLatencies[Math.min(p95Idx, sortedLatencies.length - 1)] : service.stats.p95_latency;
+
   const maxLatencyVal = Math.max(
-    ...latencyHistory.map((p) => p.latency_ms),
-    service.stats.max_latency || 200,
+    ...activeLatencyHistory.map((p) => p.latency_ms),
+    currentPeakLatency || 200,
     100
   );
   // Round up to clean ceiling (e.g. 100, 250, 500, 1000)
   const yCeil = Math.ceil(maxLatencyVal / 50) * 50;
 
-  const pointsCount = latencyHistory.length;
-  const coordinates = latencyHistory.map((p, i) => {
+  const pointsCount = activeLatencyHistory.length;
+  const coordinates = activeLatencyHistory.map((p, i) => {
     const x = pointsCount <= 1
       ? padLeft + graphW / 2
       : padLeft + (i / (pointsCount - 1)) * graphW;
@@ -468,24 +487,44 @@ export default function ServiceDetailPage() {
             <div className="flex items-center space-x-2">
               <Activity className="w-4 h-4 text-cyan-400" />
               <h2 className="text-xs font-black text-white uppercase tracking-wider">
-                API Response Time Telemetry (Past 24 Hours)
+                API Response Time Telemetry
               </h2>
             </div>
 
-            {/* Latency Stats Badges */}
-            <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono">
-              <span className="px-2 py-0.5 bg-black border border-zinc-800 text-zinc-400">
-                MIN: <strong className="text-white">{service.stats.min_latency}ms</strong>
-              </span>
-              <span className="px-2 py-0.5 bg-black border border-zinc-800 text-zinc-400">
-                AVG: <strong className="text-cyan-300">{service.stats.avg_latency}ms</strong>
-              </span>
-              <span className="px-2 py-0.5 bg-black border border-zinc-800 text-zinc-400">
-                P95: <strong className="text-amber-300">{service.stats.p95_latency}ms</strong>
-              </span>
-              <span className="px-2 py-0.5 bg-black border border-zinc-800 text-zinc-400">
-                PEAK: <strong className="text-rose-400">{service.stats.max_latency}ms</strong>
-              </span>
+            {/* Time-Range Selector Rocker & Metrics Badges */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex border border-zinc-700 bg-black p-0.5 text-[10px] font-mono">
+                {(["6h", "12h", "24h"] as const).map((range) => (
+                  <button
+                    key={range}
+                    type="button"
+                    onClick={() => setLatencyRange(range)}
+                    className={`px-2 py-0.5 uppercase font-bold transition ${
+                      latencyRange === range
+                        ? "bg-cyan-400 text-black shadow-sm font-black"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    {range.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+
+              {/* Latency Stats Badges */}
+              <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono">
+                <span className="px-2 py-0.5 bg-black border border-zinc-800 text-zinc-400">
+                  MIN: <strong className="text-white">{currentMinLatency}ms</strong>
+                </span>
+                <span className="px-2 py-0.5 bg-black border border-zinc-800 text-zinc-400">
+                  AVG: <strong className="text-cyan-300">{currentAvgLatency}ms</strong>
+                </span>
+                <span className="px-2 py-0.5 bg-black border border-zinc-800 text-zinc-400">
+                  P95: <strong className="text-amber-300">{currentP95Latency}ms</strong>
+                </span>
+                <span className="px-2 py-0.5 bg-black border border-zinc-800 text-zinc-400">
+                  PEAK: <strong className="text-rose-400">{currentPeakLatency}ms</strong>
+                </span>
+              </div>
             </div>
           </div>
 
@@ -585,8 +624,8 @@ export default function ServiceDetailPage() {
 
             {/* Time Scale Footer */}
             <div className="flex items-center justify-between px-2 pt-2 text-[10px] text-zinc-500 font-mono border-t border-zinc-900">
-              <span>24 HOURS AGO</span>
-              <span className="text-zinc-600">LIVE LATENCY PROBES</span>
+              <span>{latencyRange === "6h" ? "6 HOURS AGO" : latencyRange === "12h" ? "12 HOURS AGO" : "24 HOURS AGO"}</span>
+              <span className="text-zinc-600">LIVE LATENCY PROBES ({activeLatencyHistory.length})</span>
               <span>NOW</span>
             </div>
           </div>

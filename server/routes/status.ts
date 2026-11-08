@@ -50,7 +50,27 @@ router.get("/", statusRateLimiter, async (_req: Request, res: Response) => {
       ORDER BY i.last_seen_at DESC
       LIMIT 15
     `);
-    const incidents = incRes.rows as any[];
+    const incidentsRaw = incRes.rows as any[];
+
+    // Fetch chronological timeline updates for public incidents
+    const incidentIds = incidentsRaw.map((inc) => inc.id);
+    const updatesMap: Record<string, any[]> = {};
+    if (incidentIds.length > 0) {
+      const placeholders = incidentIds.map(() => "?").join(",");
+      const updRes = await db.execute({
+        sql: `SELECT id, incident_id, status, message, created_at FROM incident_updates WHERE incident_id IN (${placeholders}) ORDER BY created_at ASC`,
+        args: incidentIds,
+      });
+      for (const u of updRes.rows as any[]) {
+        if (!updatesMap[u.incident_id]) updatesMap[u.incident_id] = [];
+        updatesMap[u.incident_id].push(u);
+      }
+    }
+
+    const incidents = incidentsRaw.map((inc) => ({
+      ...inc,
+      updates: updatesMap[inc.id] || [],
+    }));
 
     const hasCritical = services.some((s) => s.status === "critical");
     const hasWarning = services.some((s) => s.status === "warning");
@@ -185,6 +205,7 @@ router.get("/", statusRateLimiter, async (_req: Request, res: Response) => {
       show_incidents: "true",
       footer_text: "Crystal Studio Labs • Autonomous Reliability Sentinel",
       support_url: "https://github.com/Crystal-Studio-Labs",
+      accent_color: "emerald",
     };
     for (const row of settingsRes.rows) {
       if (row.key && row.value !== undefined) {
@@ -223,6 +244,7 @@ router.get("/settings", async (_req: Request, res: Response) => {
       show_incidents: "true",
       footer_text: "Crystal Studio Labs • Autonomous Reliability Sentinel",
       support_url: "https://github.com/Crystal-Studio-Labs",
+      accent_color: "emerald",
     };
     for (const row of settingsRes.rows) {
       if (row.key && row.value !== undefined) {

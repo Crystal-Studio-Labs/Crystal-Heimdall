@@ -7,7 +7,10 @@ import {
   Lock,
   LayoutDashboard,
   LogOut,
-  CheckCircle2
+  CheckCircle2,
+  QrCode,
+  Copy,
+  Check
 } from "lucide-react";
 import { setAuthToken, getSessionInfo, clearAuthToken } from "../lib/api";
 import { useToast } from "../lib/ToastContext";
@@ -25,6 +28,44 @@ export default function LoginPage() {
   const [totpCode, setTotpCode] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLocked, setIsLocked] = useState(true);
+  const [qrData, setQrData] = useState<{ qrDataUrl: string; secret: string; otpauth: string } | null>(null);
+  const [copiedSecret, setCopiedSecret] = useState(false);
+
+  // Check whether 2FA pairing is locked or if this is a first-time fresh installation
+  useEffect(() => {
+    async function checkStatus() {
+      try {
+        const res = await fetch("/api/v1/auth/status");
+        if (res.ok) {
+          const data = await res.json();
+          const locked = data.isLocked !== false;
+          setIsLocked(locked);
+          if (!locked) {
+            const setupRes = await fetch("/api/v1/auth/setup-2fa");
+            if (setupRes.ok) {
+              const setupData = await setupRes.json();
+              setQrData({
+                qrDataUrl: setupData.qrDataUrl,
+                secret: setupData.secret,
+                otpauth: setupData.otpauth,
+              });
+            }
+          }
+        }
+      } catch {
+        setIsLocked(true);
+      }
+    }
+    checkStatus();
+  }, []);
+
+  const handleCopySecret = (secret: string) => {
+    navigator.clipboard.writeText(secret);
+    setCopiedSecret(true);
+    toast.success("Secret key copied to clipboard");
+    setTimeout(() => setCopiedSecret(false), 2000);
+  };
 
   // Auto-redirect to dashboard if operator already has an active, valid session (at least 7 days)
   useEffect(() => {
@@ -97,17 +138,51 @@ export default function LoginPage() {
           <div className="space-y-2 border-b-2 border-zinc-800 pb-5">
             <div className="flex items-center justify-between">
               <span className="px-2 py-0.5 text-[10px] bg-emerald-950 border border-emerald-500 text-emerald-400 font-bold uppercase">
-                [GATE_01] 2FA DIRECT ACCESS
+                {!isLocked ? "[FIRST-TIME SETUP] 2FA PAIRING" : "[GATE_01] 2FA DIRECT ACCESS"}
               </span>
               <span className="text-[10px] text-zinc-500">CRYSTAL STUDIO LABS</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
-              Two-Factor Authentication
+              {!isLocked ? "Setup 2FA Authenticator" : "Two-Factor Authentication"}
             </h1>
             <p className="text-xs text-zinc-400 font-sans leading-relaxed">
-              Enter the rolling 6-digit TOTP code from your paired authenticator app (Google Authenticator, Ente Auth, 1Password).
+              {!isLocked
+                ? "Scan this QR code with Google Authenticator, Ente Auth, or 1Password, then enter the 6-digit rolling code below to permanently seal and pair your credentials."
+                : "Enter the rolling 6-digit TOTP code from your paired authenticator app (Google Authenticator, Ente Auth, 1Password)."}
             </p>
           </div>
+
+          {/* First-Time QR Code Display */}
+          {!isLocked && qrData && (
+            <div className="p-4 bg-black border-2 border-emerald-500/80 shadow-[4px_4px_0px_#10b981] space-y-3 flex flex-col items-center text-center">
+              <div className="p-2 bg-white border border-zinc-200 shadow-sm">
+                <img
+                  src={qrData.qrDataUrl}
+                  alt="2FA Pairing QR Code"
+                  className="w-44 h-44 block"
+                />
+              </div>
+
+              <div className="space-y-1 w-full text-left">
+                <span className="text-[10px] text-zinc-500 font-mono uppercase block">
+                  Manual Base32 Secret Key:
+                </span>
+                <div className="flex items-center gap-1.5 bg-zinc-950 border border-zinc-800 p-2 text-xs font-mono">
+                  <span className="text-emerald-400 font-bold tracking-wider truncate flex-1 select-all">
+                    {qrData.secret}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopySecret(qrData.secret)}
+                    className="p-1 px-2 bg-zinc-900 border border-zinc-700 hover:border-emerald-400 text-[10px] text-zinc-300 hover:text-white uppercase font-bold flex items-center gap-1"
+                  >
+                    {copiedSecret ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedSecret ? "COPIED" : "COPY"}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Error Banner */}
           {errorMessage && (
@@ -160,7 +235,7 @@ export default function LoginPage() {
                 <span>// 6-DIGIT ROLLING TOTP CODE //</span>
                 <span className="text-emerald-400 font-mono flex items-center gap-1 text-[10px]">
                   <Lock className="w-3 h-3 text-emerald-400" />
-                  <span>[ LOCKED & ACTIVE ]</span>
+                  <span>{!isLocked ? "[ PAIRING PENDING ]" : "[ LOCKED & ACTIVE ]"}</span>
                 </span>
               </div>
               <input
@@ -181,7 +256,7 @@ export default function LoginPage() {
               disabled={isSubmitting || totpCode.length < 6}
               className="w-full py-4 btn-primary text-xs flex items-center justify-center gap-2 uppercase tracking-wider"
             >
-              <span>{isSubmitting ? "Authorizing Session..." : "[ VERIFY & AUTHORIZE OPERATOR ]"}</span>
+              <span>{isSubmitting ? "Authorizing Session..." : !isLocked ? "[ PAIR & AUTHORIZE OPERATOR ]" : "[ VERIFY & AUTHORIZE OPERATOR ]"}</span>
               <ShieldCheck className="w-4 h-4" />
             </button>
 
@@ -189,7 +264,7 @@ export default function LoginPage() {
             <div className="pt-3 border-t-2 border-zinc-800 flex items-center justify-between text-xs">
               <span className="text-zinc-500 font-mono flex items-center gap-1.5 text-[11px]">
                 <Lock className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Pairing Sealed • Deployed Guard</span>
+                <span>{!isLocked ? "Unsealed Setup Mode" : "Pairing Sealed • Deployed Guard"}</span>
               </span>
 
               <span className="text-[10px] text-zinc-500 font-mono">

@@ -63,6 +63,7 @@ interface StatusSettings {
   show_incidents: boolean;
   footer_text: string;
   support_url: string;
+  accent_color?: string;
 }
 
 interface AdvancedSettings {
@@ -95,6 +96,7 @@ export default function SettingsPage() {
     show_incidents: true,
     footer_text: "Crystal Studio Labs • Autonomous Reliability Sentinel",
     support_url: "https://github.com/Crystal-Studio-Labs",
+    accent_color: "emerald",
   });
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
@@ -343,6 +345,7 @@ export default function SettingsPage() {
             show_incidents: s.show_incidents === undefined ? true : (s.show_incidents === "true" || s.show_incidents === true),
             footer_text: s.footer_text || "Crystal Studio Labs • Autonomous Reliability Sentinel",
             support_url: s.support_url || "https://github.com/Crystal-Studio-Labs",
+            accent_color: s.accent_color || "emerald",
           });
 
           setAdvancedSettings({
@@ -673,6 +676,45 @@ export default function SettingsPage() {
                     className="w-full p-2.5 bg-black border-2 border-zinc-700 text-white font-mono text-xs focus:border-cyan-400 outline-none"
                   />
                   <span className="text-[10px] text-zinc-500">Subtitle displayed under the hero banner</span>
+                </div>
+              </div>
+
+              {/* BRAND ACCENT COLOR PALETTE */}
+              <div className="p-5 bg-black border-2 border-zinc-800 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <div>
+                    <h3 className="text-xs font-bold text-white uppercase">// BRAND ACCENT PALETTE //</h3>
+                    <p className="text-[11px] text-zinc-400 font-sans">
+                      Select your organization's signature cyber-industrial accent glow and highlights.
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-zinc-500 font-mono">
+                    CURRENT: {(statusSettings.accent_color || "emerald").toUpperCase()}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
+                  {[
+                    { id: "emerald", label: "EMERALD", hex: "#10b981", swatch: "bg-emerald-500", border: "border-emerald-400 text-emerald-300" },
+                    { id: "cyan", label: "ELECTRIC CYAN", hex: "#06b6d4", swatch: "bg-cyan-500", border: "border-cyan-400 text-cyan-300" },
+                    { id: "amber", label: "AMBER HAZARD", hex: "#f59e0b", swatch: "bg-amber-500", border: "border-amber-400 text-amber-300" },
+                    { id: "violet", label: "CYBER VIOLET", hex: "#8b5cf6", swatch: "bg-purple-500", border: "border-purple-400 text-purple-300" },
+                    { id: "rose", label: "NEON ROSE", hex: "#f43f5e", swatch: "bg-rose-500", border: "border-rose-400 text-rose-300" },
+                  ].map((color) => (
+                    <button
+                      key={color.id}
+                      type="button"
+                      onClick={() => setStatusSettings({ ...statusSettings, accent_color: color.id })}
+                      className={`p-2.5 border-2 text-xs font-mono font-bold flex items-center justify-center gap-2 transition ${
+                        (statusSettings.accent_color || "emerald") === color.id
+                          ? `${color.border} bg-zinc-900 shadow-[2px_2px_0px_#000]`
+                          : "border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-white hover:border-zinc-700"
+                      }`}
+                    >
+                      <span className={`w-3 h-3 ${color.swatch} inline-block shrink-0`} />
+                      <span className="text-[10px] uppercase">{color.label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
