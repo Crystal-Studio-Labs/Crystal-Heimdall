@@ -89,5 +89,17 @@
       "path": "/api/v1/cron/poll",
       "schedule": "0 0 * * *"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/status/widget(.*)",
+      "destination": "/api/v1/badges/fleet/status.svg",
+      "permanent": true
+    },
+    {
+      "source": "/widget(.*)",
+      "destination": "/api/v1/badges/fleet/status.svg",
+      "permanent": true
+    }
   ]
 }
