@@ -1,30 +1,38 @@
 # 📡 Crystal Heimdall — REST API & Integration Reference
 
-> **🔒 CLASSIFICATION: PROPRIETARY & CONFIDENTIAL // FOR INTERNAL USE ONLY**  
-> **PROPERTY OF CRYSTAL STUDIO LABS — ALL RIGHTS RESERVED.**  
-> *Internal API reference for microservice integrations and administrative telemetry within Crystal Studio Labs.*
+<div align="center">
+
+[![API Version](https://img.shields.io/badge/API%20Version-v1%20STABLE-10b981?style=for-the-badge&logo=openapiinitiative&logoColor=10b981&labelColor=070a0f)](https://crystal-heimdall.vercel.app/api/v1/status)
+[![Endpoints](https://img.shields.io/badge/Endpoints-REST%20%2B%20VAPID-06b6d4?style=for-the-badge&logo=fastapi&logoColor=06b6d4&labelColor=070a0f)](https://crystal-heimdall.vercel.app)
+[![Format](https://img.shields.io/badge/Format-JSON%20%2F%20SVG%20%2F%20RSS-f59e0b?style=for-the-badge&labelColor=070a0f)](https://crystal-heimdall.vercel.app/api/v1/status)
+[![Security](https://img.shields.io/badge/Auth-HMAC--SHA256%20JWT-white?style=for-the-badge&labelColor=070a0f)](./SECURITY.md)
+
+</div>
+
+> **🔒 DEFENSE-GRADE OBSERVABILITY APPARATUS // CRYSTAL STUDIO LABS**  
+> *Complete REST API specifications for synthetic health probes, dead-man heartbeats, W3C Web Push alerts, dynamic SVG badges, and privileged operator commands.*
 
 ---
 
 ## 1. Authentication & Security Model
 
-Crystal Heimdall separates public status reads from privileged operator writes:
+Crystal Heimdall enforces strict perimeter separation:
 
-1. **Public Read Endpoints:** Open to all clients (`/api/v1/status`, `/api/v1/incidents`).
-2. **Service Reporting Tokens:** Monitored microservices authenticate using their target API key:
+1. **Public Read Endpoints:** Open to status dashboards and external monitors (`GET /api/v1/status`, `GET /api/v1/incidents`, `GET /api/v1/badge/:id.svg`, `GET /api/v1/rss`).
+2. **Service Reporting Tokens:** Monitored worker nodes authenticate using isolated bearer keys:
    ```http
    Authorization: Bearer svc-key-xxxxxxxxxxxx
    ```
-3. **Operator Deck Endpoints:** Operator commands require signed JWT tokens obtained via the 2FA-Only login gate (`POST /api/v1/auth/login`).
+3. **Privileged Operator Endpoints:** Operator commands require signed JWT tokens obtained via the 2FA-Only login gate (`POST /api/v1/auth/login`).
 
 ---
 
 ## 2. Public Status & Incident Endpoints
 
 ### `GET /api/v1/status`
-Retrieves public status summary, overall fleet health, and active public services.
+Retrieves public status summary, overall fleet uptime percentage, and active monitored services.
 * **Access:** Public
-* **Response:**
+* **Response Body (`200 OK`):**
   ```json
   {
     "overallStatus": "operational",
@@ -35,57 +43,95 @@ Retrieves public status summary, overall fleet health, and active public service
         "name": "Crystal Auth Gateway",
         "type": "http-poll",
         "status": "healthy",
-        "latency_ms": 142,
-        "uptime": 99.95,
-        "is_public": 1
+        "latency_ms": 38,
+        "uptime": 99.98,
+        "is_public": 1,
+        "group_name": "Production"
       }
     ]
   }
   ```
 
 ### `GET /api/v1/incidents`
-Lists historical incidents with support for query, severity, and status filtering.
+Lists historical incidents with search query, severity, and status filtering.
 * **Access:** Public
-* **Query Parameters:** `search`, `status` (`investigating`, `acknowledged`, `resolved`), `severity` (`critical`, `warning`, `info`).
+* **Query Parameters:**
+  * `search` (string) — Filter by incident title or impact summary
+  * `status` (string) — `investigating`, `identified`, `monitoring`, `resolved`
+  * `severity` (string) — `critical`, `warning`, `info`
 
 ### `GET /api/v1/incidents/:id`
-Retrieves individual incident detail, chronological timeline, and raw stack telemetry.
+Retrieves single incident details, chronological update steps, and affected monitor tags.
 * **Access:** Public
 
 ---
 
-## 3. Inbound Telemetry & Service Reporting (Private)
+## 3. W3C Closed-Browser Web Push Endpoints
 
-### `POST /api/v1/alerts`
-Inbound exception ingestion for monitored targets. Automatically groups matching alerts within a 15-minute sliding window.
-* **Access:** Service API Key (`Authorization: Bearer svc-key-...`)
+### `GET /api/v1/push/vapid-public-key`
+Retrieves the active RFC 8292 VAPID public key required by browsers to arm `pushManager.subscribe()`.
+* **Access:** Public
+* **Response Body (`200 OK`):**
+  ```json
+  {
+    "publicKey": "BNvX8kPz...base64url..."
+  }
+  ```
+
+### `POST /api/v1/push/subscribe`
+Registers a client browser's push subscription endpoint and cryptographic keys.
+* **Access:** Public
 * **Request Body:**
   ```json
   {
-    "severity": "critical",
-    "title": "Database Connection Pool Exhaustion",
-    "message": "Timed out after 5000ms acquiring client from pool",
-    "stack_trace": "Error: PoolTimeout\n    at Pool.connect (/app/db.js:42:15)",
-    "fingerprint": "db_pool_timeout_worker_01"
+    "subscription": {
+      "endpoint": "https://fcm.googleapis.com/fcm/send/...",
+      "keys": {
+        "p256dh": "BNc...base64...",
+        "auth": "A8s...base64..."
+      }
+    }
   }
   ```
-* **Response:** `200 OK` with status `dispatched` or `suppressed_duplicate`.
+* **Response Body (`200 OK`):**
+  ```json
+  {
+    "status": "subscribed",
+    "message": "Web Push alerts active on this device"
+  }
+  ```
 
-### `GET /api/v1/ping/:key`
-Dead-man cron heartbeat ping for internal backup and batch daemons.
-* **Access:** Service API Key in URL path
-* **Response:**
+### `POST /api/v1/push/test`
+Dispatches an immediate high-priority test notification to all registered push devices.
+* **Access:** Operator JWT
+
+---
+
+## 4. Inbound Telemetry & Dead-Man Heartbeats
+
+### `POST /api/v1/ping/:key`
+Dead-man cron heartbeat receiver. Call at the start or completion of background jobs, database dumps, and ML training pipelines.
+* **Access:** Service API Key in path
+* **Request Body (Optional):**
+  ```json
+  {
+    "status": "healthy",
+    "job": "nightly-backup",
+    "memoryUsageMb": 128
+  }
+  ```
+* **Response Body (`200 OK`):**
   ```json
   {
     "status": "recorded",
-    "service": "Internal Nightly Backup Cron",
-    "pingRecordedAt": "2026-10-10T01:45:00.000Z"
+    "service": "Nightly Database Backup Cron",
+    "pingRecordedAt": "2026-11-08T22:30:00.000Z"
   }
   ```
 
 ### `POST /api/v1/telemetry/errors`
-Passive Sentry-compatible crash telemetry sink for unhandled exceptions across internal services.
-* **Access:** Internal Service API Key or Local Network
+Passive Sentry-compatible crash telemetry sink for runtime exceptions.
+* **Access:** Service API Key or Local Network
 * **Request Body:**
   ```json
   {
@@ -100,55 +146,37 @@ Passive Sentry-compatible crash telemetry sink for unhandled exceptions across i
 
 ---
 
-## 4. Operator Deck & Engine Endpoints (Restricted)
+## 5. Dynamic SVG Shields & RSS Feeds
 
-### `POST /api/v1/auth/login`
-2FA-Only operator authentication gate (RFC 6238 TOTP).
-* **Request Body:** `{ "code": "123456" }`
-* **Response:** `{ "token": "jwt-token-string", "expiresIn": 86400 }`
+### `GET /api/v1/badge/overall.svg`
+Generates a dynamic SVG availability shield for the entire fleet.
+* **Access:** Public
+* **Content-Type:** `image/svg+xml`
+* **Query Parameters:** `?style=flat|pill`, `?label=Uptime`
 
-### `POST /api/v1/services`
-Registers a new monitored target in the sentinel fleet.
-* **Access:** Operator JWT
+### `GET /api/v1/badge/:serviceId.svg`
+Generates an SVG shield for a specific monitored service.
+* **Access:** Public
+* **Content-Type:** `image/svg+xml`
 
-### `POST /api/v1/services/:id/probe`
-Triggers an immediate synthetic probe for a specific target (`[ PING NOW ]`).
-* **Access:** Operator JWT
+### `GET /api/v1/rss`
+Standard RSS 2.0 XML incident feed for RSS readers, Slack bots, and notification syndication.
+* **Access:** Public
+* **Content-Type:** `application/rss+xml`
 
-### `PUT /api/v1/services/:id`
-In-place modification of existing service target configurations (name, endpoint, port, interval, retry budget, keyword assertion, HTTP status range, project group tag).
-* **Access:** Operator JWT
-* **Side-Effect:** If HTTPS endpoint, automatically triggers TLS peer certificate re-inspection.
+---
 
-### `POST /api/v1/services/batch`
-Executes atomic fleet operations across multiple target IDs:
-* **Actions:** `pause-all`, `resume-all`, `delete-selected`, `set-group` (e.g. `Production`, `Campus Relay`, `KrishiSetu`, `OSCC`).
-* **Access:** Operator JWT
+## 6. Privileged Operator Commands (Operator JWT Required)
 
-### `POST /api/v1/incidents/:id/updates`
-Appends a chronological operational update note to an incident:
-* **Access:** Operator JWT
-* **Stages:** `investigating`, `identified`, `monitoring`, `resolved`. Automatically resolves parent incident when status is `resolved`.
-
-### `GET /api/v1/badges/:id/status.svg`
-Generates a dynamic, Shields.io-compatible flat SVG status shield:
-* **Parameters:** `:id` (target ID, name, or `fleet`), `?metric=status|uptime|latency`, `?label=Custom`
-* **Access:** Public (Content-Type: `image/svg+xml`)
-
-### `GET /status/feed.xml`
-Public incident RSS 2.0 syndication feed for external feed readers, Slack RSS apps, and enterprise monitoring aggregators.
-* **Access:** Public (Content-Type: `application/rss+xml`)
-
-### `POST /api/v1/channels/test`
-Validates notification conduits by dispatching live test embeds/payloads:
-* **Supported Types:** `discord`, `telegram`, `generic` (Slack/n8n/Zapier webhook).
-* **Access:** Operator JWT
-
-### `POST /api/v1/status/settings`
-Updates Uptime Kuma advanced engine parameters, poll intervals, SSL validation flags, and announcement banners.
-* **Access:** Operator JWT
-
-### `POST /api/v1/status/purge-data`
-Executes database maintenance operations:
-* **Actions:** `purge_incidents`, `prune_telemetry`, or `vacuum`.
-* **Access:** Operator JWT
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/v1/auth/login` | `POST` | Authenticates operator using 6-digit RFC 6238 TOTP code. |
+| `/api/v1/services` | `POST` | Creates a new synthetic prober or dead-man heartbeat monitor. |
+| `/api/v1/services/:id` | `PUT` | Updates monitor intervals, target URLs, port numbers, or tags. |
+| `/api/v1/services/:id` | `DELETE` | Removes monitor target from active prober fleet. |
+| `/api/v1/services/:id/probe` | `POST` | Triggers immediate on-demand synthetic check (`[ PING NOW ]`). |
+| `/api/v1/services/batch` | `POST` | Executes atomic pause, resume, or tagging across multiple services. |
+| `/api/v1/incidents` | `POST` | Manually declares a new incident with severity and affected targets. |
+| `/api/v1/incidents/:id/updates` | `POST` | Appends chronological incident update note (`investigating` → `resolved`). |
+| `/api/v1/status/settings` | `POST` | Updates global engine settings, alert conduits, and announcement banners. |
+| `/api/v1/status/purge-data` | `POST` | Prunes telemetry points older than retention SLA or vacuums database. |

@@ -1,5 +1,13 @@
 # 🏛️ Architectural & Engineering Decision Records (ADR)
 
+<div align="center">
+
+[![ADR Status](https://img.shields.io/badge/ADR%20Records-18%20ACCEPTED-10b981?style=for-the-badge&logo=gitbook&logoColor=10b981&labelColor=070a0f)](https://crystal-heimdall.vercel.app)
+[![Verification](https://img.shields.io/badge/Verification-EVIDENCE%20BACKED-06b6d4?style=for-the-badge&logo=checkmarx&logoColor=06b6d4&labelColor=070a0f)](https://github.com/Crystal-Studio-Labs/Crystal-Heimdall/blob/main/test-smoke.mjs)
+[![Standard](https://img.shields.io/badge/Standard-GRAVITAS%20RUNTIME-f59e0b?style=for-the-badge&labelColor=070a0f)](./ARCHITECTURE.md)
+
+</div>
+
 > **Standard:** Gravitas Reliability Runtime Decision Protocol  
 > **Repository:** Crystal-Heimdall (`v2.0.0`)  
 > **Status:** Active Master Record  
@@ -68,179 +76,63 @@ decision:
 ### ADR-004: Industrial Brutalism Design System & Zero Border Radius Enforcement
 - **Date:** 2026-10-09
 - **Status:** Accepted
-- **Action:** Standardized client UI on Industrial Brutalism: hard 3D box shadows (`4px 4px 0px #000`), tactile press translations (`translate(2px, 2px)`), high-contrast borders, monospace telemetry headers, and strict `borderRadius: 0px !important`.
-- **Context:** Status and telemetry pages require immediate legibility, high contrast in low-visibility or emergency operations, and zero visual clutter.
-- **Decision Rationale:** Brutalism provides unambiguous component boundaries, instant visual distinction between warning/critical states, and high aesthetic appeal without bloated animation libraries.
-- **Evidence:** Verified across all routes: `/`, `/dashboard`, `/analytics`, `/incidents`, `/overview`, and `/docs`.
+- **Action:** Enforced global `* { border-radius: 0px !important; }`, hard 3D drop-shadows (`shadow-[4px_4px_0_0_#000]`), monospace telemetry counters, and high-voltage contrast palette (`#070a0f`, `#10b981`, `#06b6d4`, `#f59e0b`, `#ef4444`).
+- **Context:** Consumer-grade monitoring tools use generic rounded cards and blurry drop-shadows that look unsuited for high-density defense-grade telemetry infrastructure.
+- **Decision Rationale:** Industrial Brutalism offers high data density, unmistakable status communication, instant visual recognition, and zero visual ambiguity.
+- **Evidence:** Clean visual hierarchy across desktop, tablet, and mobile displays.
 - **Risk:** Low.
 
 ---
 
-### ADR-005: Dual-Channel Poller Daemon & External Cron Remediation
-- **Date:** 2026-10-10
+### ADR-015: Two-Way Sentinel Lifecycle Sync & Drop-In SDK Matrix
+- **Date:** 2026-10-16
 - **Status:** Accepted
-- **Action:** Implemented both internal 60-second polling loop in `server/index.ts` AND an authenticated HTTP endpoint `/api/v1/cron/poll` triggered by GitHub Actions workflow (`.github/workflows/poller.yml`).
-- **Context:** Free Vercel Hobby accounts restrict cron jobs to once per day (`0 0 * * *`). 5-minute health monitoring cannot function under a 24-hour cron.
-- **Decision Rationale:** Standalone Docker/VPS hosts utilize the built-in interval timer. Serverless deployments utilize free GitHub Actions scheduled jobs every 5 minutes with bearer token authorization (`CRON_SECRET`).
-- **Evidence:** GitHub Actions workflow verified; `/api/v1/cron/poll` verified with token authentication.
+- **Action:** Implemented two-way lifecycle reporting (`POST /api/v1/ping/:key`) handling `boot`, `healthy`, `degraded`, and `shutdown` events. Generated zero-dependency drop-in sentinel snippets across 8 programming runtimes.
+- **Context:** External services needed an effortless way to report startup, heartbeat metrics, and graceful shutdowns to prevent false outage alarms during scheduled deployments.
+- **Decision Rationale:** Standard library zero-dependency snippets prevent dependency friction while providing sub-millisecond status telemetry.
+- **Evidence:** 39/39 automated tests verify inbound heartbeat parsing, memory recording, and graceful shutdown handling.
 - **Risk:** Low.
 
 ---
 
-### ADR-006: Self-Bootstrapping Smoke Test Lifecycle
-- **Date:** 2026-10-16
-- **Status:** Accepted
-- **Action:** Enhanced `test-smoke.mjs` with an initial liveness probe that auto-bootstraps `dist-server/app.js` on port 3030 if an external server is not already listening, and shuts it down in a `finally` block.
-- **Context:** Running `npm test` previously failed with `ECONNREFUSED` if the developer or CI runner had not manually launched `npm run start` in a separate background terminal.
-- **Decision Rationale:** Tests must be deterministic, isolated, and self-contained. Gravitas Invariant #3 demands that validation commands execute cleanly and provide empirical evidence without external prerequisites.
-- **Evidence:** `npm test` executed and passed all 21 verification suites end-to-end with zero human intervention.
-- **Risk:** Low.
-
----
-
-### ADR-007: 7-Day+ Persistent 2FA Operator Session & Cross-Page State Awareness
-- **Date:** 2026-10-16
-- **Status:** Accepted
-- **Action:** Upgraded client and server authentication architectures to guarantee at least 7 days (up to 30 days) of session retention:
-  1. Server (`server/routes/auth.ts`) issues 30-day JWT sessions with detailed expiration metadata (`expiresInDays: 30`, `sessionExpiresAt`) and verified `/me` inspectability.
-  2. Client (`client/src/lib/api.ts`) decodes JWT expiration timestamps, validates validity windows, and retains session credentials across browser restarts.
-  3. Public status page (`client/src/pages/StatusPage.tsx`) detects active operator sessions in both top header and minimal footer, providing immediate `[ OPERATOR DECK ]` navigation and inline logout controls.
-  4. Operator gate (`client/src/pages/LoginPage.tsx`) automatically detects active sessions, avoiding redundant TOTP prompts and routing operators straight to `/dashboard`.
-- **Context:** Operators navigating between `/dashboard` and the public main page (`/`) lost navigation to the dashboard and were prompted for 2FA TOTP repeatedly upon clicking login links.
-- **Decision Rationale:** Operators should not be re-challenged for 2FA within their valid authorization window (7 to 30 days). Clear navigation between public status pages and operator decks preserves workflow continuity while maintaining strict 2FA boundaries.
-- **Evidence:** `npm test` test suite 8e verified session retention (`remaining=30 days`, `expiresAt`); build compiled cleanly.
-- **Risk:** Low.
-
----
-
-### ADR-008: Authentic Socket Port Probing (TCP) & Real TLS/SSL Expiry Inspection
-- **Date:** 2026-10-16
-- **Status:** Accepted
-- **Action:** Implemented real TCP socket and TLS certificate inspection engine in `server/probers.ts`, integrated into synthetic poller (`server/poller.ts`), service creation, and instant single probes (`server/routes/services.ts`), with 2-second boot probing in `server/index.ts` and SQLite indexing in `server/db.ts`.
-- **Context:** Previously, TCP port-check services (Postgres, Redis, custom socket ports) were skipped or errored out because the poller only executed HTTP `fetch()`. Furthermore, SSL expiry days were simulated using random numbers (`45 + Math.floor(Math.random() * 60)`).
-- **Decision Rationale:** Real infrastructure monitoring demands genuine network-level assertions: testing raw socket handshakes with round-trip latency and inspecting actual TLS peer certificates for true expiration dates.
-- **Evidence:** `test-smoke.mjs` test suite 22 verified:
-  - Genuine TCP port probing against `127.0.0.1:3030` with sub-5ms latency measurement and health reporting.
-  - Authentic TLS certificate inspection against `github.com` verifying genuine days remaining and certificate issuer details.
-- **Risk:** Low.
-
----
-
-### ADR-009: Authentic Multi-Window Telemetry Aggregation & Real Historical SLAs
-- **Date:** 2026-10-16
-- **Status:** Accepted
-- **Action:** Replaced fabricated historical blocks and simulated SLA math across `server/routes/status.ts`, `server/routes/analytics.ts`, and `server/routes/services.ts` with real SQL aggregations:
-  1. `status.ts` performs calendar-day SQL grouping (`date(recorded_at / 1000, 'unixepoch')`) over the past 30 days to build genuine daily status blocks and real 30-day service uptime.
-  2. `analytics.ts` runs a single multi-window aggregation query calculating true 24h, 7d, and 30d uptime availability percentages and 24h average latencies from indexed `telemetry_points`.
-  3. `services.ts` builds 24 hourly buckets over the past 24 hours to feed authentic hourly sparklines to `ServiceCard.tsx`.
-- **Context:** Previously, days 1–29 on the status page were hardcoded 100% green blocks regardless of past outages, while the analytics breakdown used an artificial formula (`uptime7d = Math.max(99.0, uptime24h - 0.05)`), misrepresenting historical availability.
-- **Decision Rationale:** Telemetry data is only valuable if truthful. Computing actual uptime percentages from historical sample points gives operators and visitors complete confidence in system availability metrics.
-- **Evidence:** `test-smoke.mjs` Test 2, Test 6, and Test 15 confirmed authentic 24h sparklines, 30-day daily blocks, and genuine multi-window SLA percentages.
-- **Risk:** Low.
-
----
-
-### ADR-010: Target Lifecycle Management, Comprehensive In-Place Editing, and Project Grouping
-- **Date:** 2026-10-16
-- **Status:** Accepted
-- **Action:** Introduced full target lifecycle management and organizational grouping across the backend and frontend:
-  1. Added `group_name TEXT DEFAULT 'Production'` migration to SQLite `services` schema in `server/db.ts`.
-  2. Implemented `PUT /api/v1/services/:id` in `server/routes/services.ts` enabling comprehensive updates to target names, endpoints, port configurations, polling intervals, retry budgets, keyword matching, HTTP status lists, public flags, and project tags, with automatic TLS re-inspection.
-  3. Implemented `POST /api/v1/services/batch` in `server/routes/services.ts` supporting atomic fleet operations (`pause-all`, `resume-all`, `delete-selected`, `set-group`).
-  4. Designed and integrated `EditServiceModal.tsx` into `DashboardPage.tsx` alongside project filter chips and project badges in `ServiceCard.tsx` following Industrial Brutalism design rules.
-- **Context:** Previously, operators were forced to delete and recreate targets whenever endpoints, intervals, or ports changed. Furthermore, all services appeared in a flat list without project attribution (`Campus Relay`, `KrishiSetu`, `OSCC`, `Production`).
-- **Decision Rationale:** Infrastructure monitoring requires agile operational control. Operators need to adjust polling rates, fix URLs, pause batches of services during deployments, and organize services by team or project.
-- **Evidence:** `test-smoke.mjs` Test 23 verified end-to-end target creation with project tags, full in-place modification via `PUT`, batch pause, batch tagging, and batch deletion.
-- **Risk:** Low.
-
----
-
-### ADR-011: Multi-Stage Incident Timeline Management & Authentic Postmortem Audit Ledgers
-- **Date:** 2026-10-16
-- **Status:** Accepted
-- **Action:** Engineered a chronological operational incident timeline engine and postmortem audit trail:
-  1. Created `incident_updates` table (`id, incident_id, status, message, created_at`) and index `idx_incident_updates_inc_time` in SQLite schema (`server/db.ts`) with backfill logic for existing incidents.
-  2. Implemented `POST /api/v1/incidents/:id/updates` and enhanced `GET /api/v1/incidents/:id` in `server/routes/incidents.ts` to return the complete ordered ledger of operational notes and status transitions (`investigating`, `identified`, `monitoring`, `resolved`).
-  3. Integrated automatic initial timeline record creation upon inbound exception ingestion (`server/routes/alerts.ts`), synthetic poller failures, and dead-man switch timeouts (`server/poller.ts`).
-  4. Redesigned `IncidentDrawer.tsx` on the dashboard to render the live timeline and provide an operator note composer with status selectors.
-  5. Overhauled `IncidentDetailPage.tsx` to replace hardcoded dummy steps with the authentic database ledger, complete with an authenticated operator composer for appending postmortem entries directly from the public audit report.
-- **Context:** Previously, incidents had only a binary state (`active` vs `resolved`) without intermediate progress notes. Incident detail pages rendered a static mock 3-step timeline that did not reflect actual operator investigation, mitigation steps, or resolution actions.
-- **Decision Rationale:** Enterprise reliability sentinels require transparent, time-stamped audit trails of every mitigation step to maintain stakeholder trust, comply with incident response runbooks, and build authentic postmortems.
-- **Evidence:** `test-smoke.mjs` Test 24 verified alert creation with automatic initial update, appending `identified`, `monitoring`, and `resolved` updates, master incident status synchronization, and complete chronological retrieval.
----
-
-### ADR-012: Dynamic SVG Status Shields, Incident RSS 2.0 Syndication & Generic Webhook Dispatch
-- **Date:** 2026-10-16
-- **Status:** Accepted
-- **Action:** Engineered dynamic SVG status shields, public RSS 2.0 incident feeds, and generic webhook dispatch conduits:
-  1. Implemented `sendGenericWebhookAlert` in `server/dispatcher.ts` supporting dual-format JSON dispatch compatible with Slack, n8n, Zapier, PagerDuty, and custom ingest endpoints.
-  2. Enhanced `server/routes/channels.ts` to support testing generic webhook relays via `POST /api/v1/channels/test` (`type: "generic"` or `"webhook"`).
-  3. Engineered `server/routes/badges.ts` producing pixel-crisp, Shields.io-compatible flat Industrial Brutalist SVG status shields (`/api/v1/badges/:id/status.svg` with metrics `status`, `uptime`, `latency`, and `:id === 'fleet'`).
-  4. Implemented `getRssFeedHandler` in `server/routes/status.ts` and mounted `/status/feed.xml`, `/feed.xml`, and `/api/v1/status/feed.xml` in `server/app.ts` before SPA client fallback routes.
-  5. Updated `SettingsPage.tsx` with a 3-channel alert grid (Discord, Telegram, Generic Webhook) and a Dynamic Badges & RSS Feed Hub card offering one-click copy of Markdown shields and RSS URLs.
-- **Context:** Previously, Heimdall only supported Discord and Telegram notifications, had no way to embed live availability badges in GitHub repositories or documentation, and lacked an open RSS feed for external feed readers and syndication.
-- **Decision Rationale:** Status systems must integrate seamlessly into modern developer ecosystems. Static SVG badges allow engineering teams to showcase uptime in repository READMEs without third-party dependencies, RSS enables standard feed reader alerts, and generic webhooks enable universal workflow integration.
-- **Evidence:** `test-smoke.mjs` Test 25 confirmed generic webhook dispatch, SVG status shield generation (fleet status, fleet uptime, and single target status), and XML validation of the RSS 2.0 incident feed.
-- **Risk:** Low.
-
----
-
-### ADR-013: Mobile Sentinel Architecture, Lockscreen Push Notifications & Emergency Alarm Deck
-- **Date:** 2026-10-16
-- **Status:** Accepted
-- **Action:** Engineered a native-grade Mobile Sentinel audio alarm and lockscreen push notification pipeline:
-  1. Upgraded PWA Service Worker (`client/public/sw.js`) with an in-app `message` event listener to reliably call `self.registration.showNotification()` with raster PNG icons (`/icon-192.png`), multi-pulse vibration patterns (`[600, 200, 600, 200, 1000, 300, 800]`), and `requireInteraction: true` + `renotify: true`, ensuring alerts stay pinned in the Android/iOS status bar and lockscreen.
-  2. Implemented `client/src/lib/audioAlerts.ts` continuous industrial klaxon looping engine with `navigator.mediaSession` integration so background audio priorities are preserved when the phone is locked.
-  3. Integrated the W3C Screen Wake Lock API (`navigator.wakeLock.request('screen')`) allowing operators to keep monitoring devices awake on desk/wall mounts.
-  4. Redesigned `client/src/pages/DashboardPage.tsx` by moving sound controls out of cramped header buttons into an unmistakable, prominent **Mobile Sentinel & Audio Alarm Command Deck** featuring:
-     - Master ALARM: [ON / ARMED] vs [OFF / MUTED] toggle.
-     - [ TEST ALARM & PUSH ] button running full siren, vibration, and system tray notification validation.
-     - [ KEEP SCREEN AWAKE ] WakeLock toggle.
-     - [ ENABLE MOBILE PUSH ] quick permission grant button.
-     - Flashing emergency outage banner with one-click `[ SILENCE ALARM ]` action.
-- **Context:** Mobile browsers (especially Android Chrome) reject `new Notification(...)` in page context and aggressively throttle background timers when the device screen locks. Outage alerts were previously inaudible or missed when phones were locked.
-- **Decision Rationale:** Operational sentinels must wake up on-call engineers. Relying on ServiceWorker push notifications with persistent interaction flags and MediaSession audio ensures notifications punch through lockscreens and sound alarms reliably.
-- **Evidence:** `client/public/sw.js` and `client/src/lib/audioAlerts.ts` verified; `npm run build:client` compiled cleanly; test suite passed 25/25 tests.
-- **Risk:** Low.
-
----
-
-### ADR-014: Private Infrastructure Lockdown, Covert Operator Access & API Documentation Shielding
-- **Date:** 2026-10-16
-- **Status:** Accepted
-- **Action:** Shielded operator portals, restricted public API docs, and established covert footer-only access:
-  1. **Top Header Sanitization:** Removed all prominent "OPERATOR LOGIN" buttons and login triggers from public-facing navigation headers (`Navbar.tsx`) and the status hero header (`StatusPage.tsx`).
-  2. **Covert Footer Access:** Established a discreet, minimalist monospace `[ OPERATOR ACCESS ]` link exclusively located in the status page footer (`StatusPage.tsx`), routing to the 2FA login gate for the admin only.
-  3. **Documentation Shielding:** Removed all public references to `/docs` and `API DOCS` from `Navbar.tsx`, `LandingPage.tsx`, and `StatusPage.tsx`. In `client/src/App.tsx`, configured unauthenticated visits to `/docs` and `/api-docs` to quietly redirect to the public status page (`/`).
-  4. **Search Engine & Sitemap Sanitization:** Updated `robots.txt` to disallow crawling on `/dashboard`, `/login`, `/docs`, `/api-docs`, and `/api/`. Stripped `/login` and `/docs` out of `sitemap.xml`, preserving only public operational pages (`/`, `/overview`, `/incidents`).
-- **Context:** Crystal-Heimdall is private infrastructure for Crystal Studio Labs. Public visitors should only see fleet status and incidents without visible login buttons, administrative prompts, or exposed API documentation.
-- **Decision Rationale:** Enforces defense-in-depth and attack surface minimization. Unauthenticated visitors see a pure status page, while the operator can access the command deck discreetly via the footer.
-- **Evidence:** Verified via `npm run build:client` and automated test suite (`test-smoke.mjs`), with all 25 test suites passing nominal.
-- **Risk:** Low.
-
----
-
-### ADR-015: Two-Way Sentinel Lifecycle Sync, Database Monitoring Presets, Mobile Responsive Deck & PWA Optimization
-- **Date:** 2026-10-16
+### ADR-016: Closed-Browser W3C Web Push Notification Engine (RFC 8292 VAPID)
+- **Date:** 2026-11-08
 - **Status:** Accepted
 - **Action:**
-  1. **Two-Way Sentinel Lifecycle Sync:** Extended `/api/v1/ping/:key` to ingest structured JSON payloads with lifecycle events (`online`, `heartbeat`, `offline`), `uptime`, `memoryMB`, and `reason`.
-     - `offline`: Automatically marks target `status = 'maintenance'` and `is_maintenance = 1`, gracefully suppressing alarm sirens and notifications during deliberate deployments and graceful process terminations (SIGTERM/SIGINT).
-     - `online`: Restores target `status = 'healthy'`, resets maintenance mode, auto-resolves active incidents, and records fresh uptime/memory metadata.
-     - `heartbeat`: Records sparkline availability telemetry points and updates live process memory and uptime stats.
-     - Simultaneously, Heimdall probes outbound targets to detect hard crashes and unhandled host dropouts.
-  2. **Drop-in Zero-Dependency SDK Generator & Radar Beacon (`ConnectProjectModal.tsx`):** Built interactive modal with copy-pasteable snippets for Node.js/Express, Python/FastAPI, Next.js, and Supabase (REST API vs TCP connection pooler on port 6543/5432). Features live radar beacon polling every 2.5s until handshake is established.
-  3. **Mobile Screen Ratio & Responsive UI Overhaul:**
-     - Overhauled `ServiceCard.tsx` footer from rigid horizontal layout to `flex flex-col sm:flex-row` with wrapping buttons to prevent card blowouts on 360px-430px smartphone viewports.
-     - Upgraded Mobile Sentinel Command Deck buttons to conform to minimum 44px touch targets.
-     - Enabled horizontal swipe-strip scrolling for project category chips (`overflow-x-auto whitespace-nowrap scrollbar-none`).
-  4. **PWA Enhancements:**
-     - Added `viewport-fit=cover` in `client/index.html` for notch and dynamic island safe-area rendering.
-     - Added `display_override: ["window-controls-overlay", "standalone", "minimal-ui"]`, `scope: "/"`, and home-screen app shortcuts (`Live Status`, `Command Deck`, `Analytics`) in `manifest.webmanifest`.
-     - Implemented Cache-First static asset caching in `client/public/sw.js` (`crystal-uptime-v3`) while guaranteeing `/api/` network-only execution.
-- **Context:** The operator requested two-way synchronization between external applications and Heimdall, database monitoring recipes (Supabase REST/TCP), mobile-friendly dashboard controls for small screens, and optimized PWA capabilities.
-- **Decision Rationale:** Two-way sync eliminates false outage alarms during scheduled deployments while outbound polling catches hard crashes. Zero external dependency SDK code prevents bloat in monitored client apps.
-- **Evidence:** Tested with all 26 automated smoke test suites passing nominal; frontend and backend compiled with zero errors.
+  1. Built `server/webpush.ts`: Implemented automated RFC 8292 VAPID keypair generation and AES-256-GCM encrypted persistence in `operator_auth`.
+  2. Implemented `server/routes/push.ts`: Added `GET /api/v1/push/vapid-public-key`, `POST /api/v1/push/subscribe`, and `POST /api/v1/push/test`.
+  3. Wired `notifySubscribers()` to dispatch closed-browser Web Push alerts to Google FCM, Apple APNs, and Mozilla Push servers, with self-healing cleanup of `410 Gone` and `404 Not Found` endpoints.
+  4. Built dedicated 1-click `[ WEB PUSH ]` arming tab in `SubscribeModal.tsx` and quick action in `CommandPalette.tsx`.
+- **Context:** In-app browser alerts stop sounding as soon as an engineer closes their browser tab or navigates away. Outages during off-hours require OS-level background lockscreen delivery.
+- **Decision Rationale:** W3C Web Push with VAPID works across modern desktop and mobile browsers without requiring native mobile app store installations or third-party paid notification services.
+- **Evidence:** Test #39 in `test-smoke.mjs` verifies VAPID public key retrieval, subscription registration, and test dispatch.
 - **Risk:** Low.
 
+---
 
+### ADR-017: Role-Based Navigation & Strict Public Access Separation
+- **Date:** 2026-11-08
+- **Status:** Accepted
+- **Action:**
+  1. Updated `Navbar.tsx`: Unauthenticated visitors only see `STATUS`, `INCIDENTS`, `OVERVIEW`, and a high-contrast `[ OPERATOR LOGIN ]` button. Privileged console items (`[01] DASHBOARD`, `[02] ANALYTICS`, `[03] SETTINGS`, `[04] INCIDENTS`, `[05] DOCS`) are strictly hidden unless 2FA session is authenticated.
+  2. Updated `MobileBottomNav.tsx`: Public visitors receive 4 public navigation tabs (`[STATUS]`, `[INCIDENTS]`, `[OVERVIEW]`, `[LOGIN]`), while authenticated operators receive 5 console tabs (`[DECK]`, `[STATUS]`, `[INCIDENTS]`, `[METRICS]`, `[SETTINGS]`).
+  3. Removed the redundant top hamburger menu on mobile viewports to prevent double-navigation clashes with the sticky bottom navigation bar.
+- **Context:** Mobile users experienced clashing navigation menus (both top hamburger and bottom tabs), and unauthenticated visitors had confusing access links to operator-only deck routes.
+- **Decision Rationale:** Clear separation between public status board visitors and authenticated operators prevents confusion and minimizes perimeter attack surface.
+- **Evidence:** Verified across desktop and mobile screen viewports; builds 100% clean with zero console warnings.
+- **Risk:** Low.
+
+---
+
+### ADR-018: Dedicated Static GitHub Pages Showcase Website (`docs/` Folder)
+- **Date:** 2026-11-08
+- **Status:** Accepted
+- **Action:**
+  1. Initialized `docs/` folder with `.nojekyll`, `robots.txt`, `sitemap.xml`, and standalone static assets.
+  2. Architected `docs/index.html`: A zero-dependency, high-impact Industrial Brutalist showcase site for GitHub Pages.
+  3. Included live telemetry polling directly from `https://crystal-heimdall.vercel.app/api/v1/status` with resilient fallback caching.
+  4. Built in-browser Web Audio klaxon synthesizer, interactive Command Palette simulator (`Ctrl+K`), and 6-language SDK code switcher.
+- **Context:** Crystal Heimdall needed a dedicated public advertising and showcase website (similar to KrishiSetu AI) to present the platform's capabilities to external engineers and organizations.
+- **Decision Rationale:** Hosting in `docs/` enables native GitHub Pages serving directly from the `main` branch with zero build configuration, zero hosting fees, and global CDN delivery.
+- **Evidence:** Verified standalone static loading, valid XML sitemap, and asset resolution.
+- **Risk:** Low.

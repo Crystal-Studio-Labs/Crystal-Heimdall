@@ -1,0 +1,72 @@
+{
+  "name": "Crystal Heimdall",
+  "short_name": "Crystal Heimdall",
+  "start_url": "/?pwa=1",
+  "id": "/?v=5",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "scope": "/",
+  "background_color": "#070a0f",
+  "theme_color": "#070a0f",
+  "description": "Continuous Multi-Point Health Monitoring, Sentry Crash Telemetry & Real-Time Incident Status",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon-192.png?v=5",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192-maskable.png?v=5",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png?v=5",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512-maskable.png?v=5",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-192.svg?v=5",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.svg?v=5",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Live Status Board",
+      "short_name": "Status",
+      "url": "/",
+      "icons": [{ "src": "/icon-192.png?v=5", "sizes": "192x192" }]
+    },
+    {
+      "name": "Operator Command Deck",
+      "short_name": "Command Deck",
+      "url": "/dashboard",
+      "icons": [{ "src": "/icon-192.png?v=5", "sizes": "192x192" }]
+    },
+    {
+      "name": "Telemetry Analytics",
+      "short_name": "Analytics",
+      "url": "/dashboard/analytics",
+      "icons": [{ "src": "/icon-192.png?v=5", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["utilities", "developer tools", "productivity"]
+}

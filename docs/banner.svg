@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 240" width="1000" height="240" fill="none">
+  <!-- Deep Background -->
+  <rect width="1000" height="240" fill="#070a0f"/>
+  
+  <!-- Subtle Grid Pattern -->
+  <defs>
+    <pattern id="banner-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#18181b" stroke-width="1" stroke-opacity="0.6"/>
+    </pattern>
+  </defs>
+  <rect width="1000" height="240" fill="url(#banner-grid)"/>
+
+  <!-- Outer Borders -->
+  <rect x="12" y="12" width="976" height="216" stroke="#27272a" stroke-width="3" fill="none"/>
+  <rect x="20" y="20" width="960" height="200" stroke="#10b981" stroke-width="1.5" stroke-opacity="0.5" fill="none"/>
+
+  <!-- Corner Brackets -->
+  <path d="M 20 45 L 20 20 L 45 20" stroke="#10b981" stroke-width="4" fill="none"/>
+  <path d="M 980 45 L 980 20 L 955 20" stroke="#10b981" stroke-width="4" fill="none"/>
+  <path d="M 20 195 L 20 220 L 45 220" stroke="#10b981" stroke-width="4" fill="none"/>
+  <path d="M 980 195 L 980 220 L 955 220" stroke="#10b981" stroke-width="4" fill="none"/>
+
+  <!-- Top Ribbon: Classification -->
+  <g transform="translate(45, 36)">
+    <rect width="320" height="26" fill="#090d14" stroke="#dc2626" stroke-width="2"/>
+    <text x="12" y="18" fill="#ef4444" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="900" letter-spacing="1.5">CONFIDENTIAL // INTERNAL USE ONLY</text>
+  </g>
+  <text x="955" y="52" fill="#71717a" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="800" text-anchor="end" letter-spacing="2">CRYSTAL STUDIO LABS</text>
+
+  <!-- Title & Icon -->
+  <g transform="translate(45, 82)">
+    <!-- Pulse Symbol -->
+    <rect x="3" y="3" width="48" height="48" fill="#000000"/>
+    <rect width="48" height="48" fill="#18181b" stroke="#10b981" stroke-width="2"/>
+    <g transform="translate(8, 8) scale(1.33333)">
+      <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" stroke="#34d399" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </g>
+    
+    <!-- Title Text -->
+    <text x="64" y="32" fill="#ffffff" font-family="'JetBrains Mono', monospace" font-size="34" font-weight="900" letter-spacing="-0.5">CRYSTAL HEIMDALL</text>
+    <text x="65" y="52" fill="#38bdf8" font-family="'JetBrains Mono', monospace" font-size="13" font-weight="800" letter-spacing="3">AUTONOMOUS RELIABILITY SENTINEL // UPTIME TRACKER</text>
+  </g>
+
+  <!-- Bottom Diagnostic Telemetry Pills -->
+  <g transform="translate(45, 175)">
+    <g transform="translate(0, 0)">
+      <rect width="170" height="28" fill="#000000" stroke="#27272a" stroke-width="1.5"/>
+      <circle cx="14" cy="14" r="4" fill="#10b981"/>
+      <text x="26" y="18" fill="#a1a1aa" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700">STATUS: NOMINAL</text>
+    </g>
+    <g transform="translate(180, 0)">
+      <rect width="180" height="28" fill="#000000" stroke="#27272a" stroke-width="1.5"/>
+      <circle cx="14" cy="14" r="4" fill="#38bdf8"/>
+      <text x="26" y="18" fill="#a1a1aa" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700">AUTH: 2FA-ONLY TOTP</text>
+    </g>
+    <g transform="translate(370, 0)">
+      <rect width="210" height="28" fill="#000000" stroke="#27272a" stroke-width="1.5"/>
+      <circle cx="14" cy="14" r="4" fill="#f59e0b"/>
+      <text x="26" y="18" fill="#a1a1aa" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700">REPO: PRIVATE // DUAL-ENGINE</text>
+    </g>
+    <g transform="translate(590, 0)">
+      <rect width="190" height="28" fill="#000000" stroke="#27272a" stroke-width="1.5"/>
+      <circle cx="14" cy="14" r="4" fill="#ec4899"/>
+      <text x="26" y="18" fill="#a1a1aa" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700">STORAGE: LIBSQL SENTINEL</text>
+    </g>
+  </g>
+</svg>

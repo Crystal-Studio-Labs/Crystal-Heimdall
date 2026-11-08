@@ -1,0 +1,7 @@
+# Robots.txt for Crystal Heimdall Showcase
+User-agent: *
+Allow: /
+Allow: /index.html
+Allow: /sitemap.xml
+
+Sitemap: https://crystal-studio-labs.github.io/Crystal-Heimdall/sitemap.xml

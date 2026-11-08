@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Android Maskable PWA Icon with 80% Safe Zone -->
+  <rect width="512" height="512" fill="#070a0f"/>
+  
+  <!-- Safe-Zone Circular Emblem -->
+  <circle cx="256" cy="256" r="196" fill="#18181b" stroke="#10b981" stroke-width="18"/>
+  <circle cx="256" cy="256" r="170" fill="#070a0f" stroke="#059669" stroke-width="6"/>
+  
+  <!-- Centered Lucide Activity Pulse (emerald-400 #34d399) -->
+  <g transform="translate(128, 128) scale(10.6667)">
+    <path d="M 2 12 L 6 12 L 9 3 L 15 21 L 18 12 L 22 12" 
+          fill="none" 
+          stroke="#34d399" 
+          stroke-width="2.5" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"/>
+  </g>
+</svg>
